@@ -1,6 +1,6 @@
 import { Link, useLocation } from "react-router-dom";
 import { useState } from "react";
-import { Menu, X, User, LogOut, ChevronDown } from "lucide-react";
+import { Menu, X, User, LogOut, ChevronDown, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -23,7 +23,7 @@ const navLinks = [
 
 export function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const { user, signOut } = useAuth();
+  const { user, signOut, isAdmin } = useAuth();
   const location = useLocation();
 
   return (
@@ -85,8 +85,16 @@ export function Header() {
                       My Account
                     </Link>
                   </DropdownMenuItem>
+                  {isAdmin && (
+                    <DropdownMenuItem asChild>
+                      <Link to="/admin" className="cursor-pointer">
+                        <Shield className="mr-2 h-4 w-4" />
+                        Admin Portal
+                      </Link>
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={signOut} className="cursor-pointer text-destructive">
+                  <DropdownMenuItem onClick={() => signOut()} className="cursor-pointer text-destructive">
                     <LogOut className="mr-2 h-4 w-4" />
                     Sign Out
                   </DropdownMenuItem>
@@ -144,6 +152,16 @@ export function Header() {
                       <User className="h-4 w-4" />
                       My Account
                     </Link>
+                    {isAdmin && (
+                      <Link
+                        to="/admin"
+                        onClick={() => setMobileMenuOpen(false)}
+                        className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground"
+                      >
+                        <Shield className="h-4 w-4" />
+                        Admin Portal
+                      </Link>
+                    )}
                     <button
                       onClick={() => {
                         signOut();

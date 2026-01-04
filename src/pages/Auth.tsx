@@ -166,18 +166,6 @@ const Auth = () => {
                 </p>
               )}
             </div>
-
-            {/* Demo credentials */}
-            <div className="mt-6 p-4 bg-muted/50 rounded-lg border border-border">
-              <p className="text-xs text-muted-foreground font-medium mb-2">Demo Accounts:</p>
-              <p className="text-xs text-muted-foreground">
-                Subscribed: <code className="bg-muted px-1 rounded">demo@cteskills.com</code>
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Free: <code className="bg-muted px-1 rounded">free@cteskills.com</code>
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">(Any password works for demo accounts)</p>
-            </div>
           </div>
         </div>
       </div>
