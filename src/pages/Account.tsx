@@ -1,13 +1,18 @@
 import { useEffect } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { Layout } from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
-import { User, CreditCard, CheckCircle, XCircle, ArrowRight } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+import { User, CreditCard, CheckCircle, XCircle, ArrowRight, Settings, Loader2 } from "lucide-react";
+import { format } from "date-fns";
 
 const Account = () => {
-  const { user, isLoading, signOut, isSubscribed } = useAuth();
+  const { user, isLoading, signOut, isSubscribed, isAdmin, refreshSubscription } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const { toast } = useToast();
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -15,11 +20,39 @@ const Account = () => {
     }
   }, [user, isLoading, navigate]);
 
+  // Check for success parameter and refresh subscription
+  useEffect(() => {
+    if (searchParams.get("success") === "true") {
+      toast({
+        title: "Payment successful!",
+        description: "Your subscription is now active.",
+      });
+      refreshSubscription();
+    }
+  }, [searchParams, refreshSubscription, toast]);
+
+  const handleManageSubscription = async () => {
+    try {
+      const { data, error } = await supabase.functions.invoke("customer-portal");
+      if (error) throw error;
+      if (data?.url) {
+        window.open(data.url, "_blank");
+      }
+    } catch (err) {
+      console.error("Error opening customer portal:", err);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to open subscription management.",
+      });
+    }
+  };
+
   if (isLoading) {
     return (
       <Layout>
         <div className="min-h-[60vh] flex items-center justify-center">
-          <p className="text-muted-foreground">Loading...</p>
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
       </Layout>
     );
@@ -44,18 +77,23 @@ const Account = () => {
                     <User className="h-8 w-8 text-primary" />
                   </div>
                   <div>
-                    <h2 className="text-xl font-semibold text-card-foreground">{user.fullName}</h2>
+                    <h2 className="text-xl font-semibold text-card-foreground">{user.fullName || "User"}</h2>
                     <p className="text-muted-foreground">{user.email}</p>
+                    {isAdmin && (
+                      <span className="inline-block mt-1 px-2 py-0.5 bg-primary/10 text-primary text-xs font-medium rounded">
+                        Admin
+                      </span>
+                    )}
                   </div>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-border">
                   <div>
                     <p className="text-sm text-muted-foreground mb-1">Account ID</p>
-                    <p className="text-sm font-mono text-foreground">{user.id}</p>
+                    <p className="text-sm font-mono text-foreground">{user.id.slice(0, 8)}...</p>
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground mb-1">Member Since</p>
-                    <p className="text-sm text-foreground">January 2024</p>
+                    <p className="text-sm text-muted-foreground mb-1">Status</p>
+                    <p className="text-sm text-foreground">{isSubscribed ? "Subscribed" : "Free"}</p>
                   </div>
                 </div>
               </div>
@@ -75,17 +113,20 @@ const Account = () => {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-border">
                       <div>
                         <p className="text-sm text-muted-foreground mb-1">Plan</p>
-                        <p className="text-sm text-foreground capitalize">
-                          {user.subscriptionPlan?.replace("_", " ")}
-                        </p>
+                        <p className="text-sm text-foreground">CTE Skills Access</p>
                       </div>
-                      <div>
-                        <p className="text-sm text-muted-foreground mb-1">Renews On</p>
-                        <p className="text-sm text-foreground">{user.subscriptionEndDate}</p>
-                      </div>
+                      {user.subscriptionEnd && (
+                        <div>
+                          <p className="text-sm text-muted-foreground mb-1">Renews On</p>
+                          <p className="text-sm text-foreground">
+                            {format(new Date(user.subscriptionEnd), "MMMM d, yyyy")}
+                          </p>
+                        </div>
+                      )}
                     </div>
-                    <Button variant="outline" className="mt-4" disabled>
-                      Manage Billing (Coming Soon)
+                    <Button variant="outline" className="mt-4" onClick={handleManageSubscription}>
+                      <Settings className="h-4 w-4 mr-2" />
+                      Manage Subscription
                     </Button>
                   </div>
                 ) : (
@@ -113,6 +154,11 @@ const Account = () => {
               <div className="bg-card rounded-xl border border-border p-6">
                 <h3 className="text-lg font-semibold text-card-foreground mb-4">Quick Actions</h3>
                 <div className="space-y-3">
+                  {isAdmin && (
+                    <Button asChild variant="default" className="w-full justify-start">
+                      <Link to="/admin">Admin Portal</Link>
+                    </Button>
+                  )}
                   <Button asChild variant="outline" className="w-full justify-start">
                     <Link to="/videos">Browse Videos</Link>
                   </Button>

@@ -1,112 +1,174 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
-import { User, demoUsers } from "@/data/mockData";
+import { supabase } from "@/integrations/supabase/client";
+import { User as SupabaseUser, Session } from "@supabase/supabase-js";
+
+interface User {
+  id: string;
+  email: string;
+  fullName: string | null;
+  isSubscribed: boolean;
+  isAdmin: boolean;
+  subscriptionEnd?: string | null;
+  stripeCustomerId?: string | null;
+}
 
 interface AuthContextType {
   user: User | null;
+  session: Session | null;
   isLoading: boolean;
   signIn: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   signUp: (email: string, password: string, fullName: string) => Promise<{ success: boolean; error?: string }>;
-  signOut: () => void;
+  signOut: () => Promise<void>;
   isSubscribed: boolean;
+  isAdmin: boolean;
+  refreshSubscription: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const AUTH_STORAGE_KEY = "cte_skills_user";
-
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    // Check localStorage for existing session
-    const storedUser = localStorage.getItem(AUTH_STORAGE_KEY);
-    if (storedUser) {
-      try {
-        setUser(JSON.parse(storedUser));
-      } catch {
-        localStorage.removeItem(AUTH_STORAGE_KEY);
+  const checkSubscription = async (supabaseUser: SupabaseUser) => {
+    try {
+      const { data, error } = await supabase.functions.invoke('check-subscription');
+      if (error) {
+        console.error('Error checking subscription:', error);
+        return { subscribed: false, subscriptionEnd: null, stripeCustomerId: null };
       }
+      return {
+        subscribed: data?.subscribed ?? false,
+        subscriptionEnd: data?.subscription_end ?? null,
+        stripeCustomerId: data?.stripe_customer_id ?? null,
+      };
+    } catch (err) {
+      console.error('Error invoking check-subscription:', err);
+      return { subscribed: false, subscriptionEnd: null, stripeCustomerId: null };
     }
-    setIsLoading(false);
+  };
+
+  const checkAdminRole = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', userId)
+        .eq('role', 'admin')
+        .maybeSingle();
+
+      if (error) {
+        console.error('Error checking admin role:', error);
+        return false;
+      }
+      return !!data;
+    } catch (err) {
+      console.error('Error checking admin role:', err);
+      return false;
+    }
+  };
+
+  const buildUser = async (supabaseUser: SupabaseUser): Promise<User> => {
+    const [subscriptionInfo, isAdmin] = await Promise.all([
+      checkSubscription(supabaseUser),
+      checkAdminRole(supabaseUser.id),
+    ]);
+
+    return {
+      id: supabaseUser.id,
+      email: supabaseUser.email || '',
+      fullName: supabaseUser.user_metadata?.full_name || supabaseUser.user_metadata?.name || null,
+      isSubscribed: subscriptionInfo.subscribed,
+      isAdmin,
+      subscriptionEnd: subscriptionInfo.subscriptionEnd,
+      stripeCustomerId: subscriptionInfo.stripeCustomerId,
+    };
+  };
+
+  const refreshSubscription = async () => {
+    if (!session?.user) return;
+    const updatedUser = await buildUser(session.user);
+    setUser(updatedUser);
+  };
+
+  useEffect(() => {
+    // Set up auth state listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, currentSession) => {
+        setSession(currentSession);
+        
+        if (currentSession?.user) {
+          // Use setTimeout to prevent potential deadlock with Supabase client
+          setTimeout(async () => {
+            const builtUser = await buildUser(currentSession.user);
+            setUser(builtUser);
+            setIsLoading(false);
+          }, 0);
+        } else {
+          setUser(null);
+          setIsLoading(false);
+        }
+      }
+    );
+
+    // Check for existing session
+    supabase.auth.getSession().then(async ({ data: { session: existingSession } }) => {
+      setSession(existingSession);
+      if (existingSession?.user) {
+        const builtUser = await buildUser(existingSession.user);
+        setUser(builtUser);
+      }
+      setIsLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   const signIn = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
-    // Simulate API delay
-    await new Promise((resolve) => setTimeout(resolve, 500));
-
-    // Check demo users
-    const demoUser = demoUsers.find((u) => u.email.toLowerCase() === email.toLowerCase());
-    if (demoUser) {
-      setUser(demoUser);
-      localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(demoUser));
-      return { success: true };
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    
+    if (error) {
+      return { success: false, error: error.message };
     }
-
-    // Check localStorage for registered users
-    const registeredUsers = JSON.parse(localStorage.getItem("cte_registered_users") || "[]");
-    const registeredUser = registeredUsers.find((u: User & { password: string }) => 
-      u.email.toLowerCase() === email.toLowerCase() && u.password === password
-    );
-
-    if (registeredUser) {
-      const { password: _, ...userWithoutPassword } = registeredUser;
-      setUser(userWithoutPassword);
-      localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(userWithoutPassword));
-      return { success: true };
-    }
-
-    return { success: false, error: "Invalid email or password" };
-  };
-
-  const signUp = async (email: string, password: string, fullName: string): Promise<{ success: boolean; error?: string }> => {
-    await new Promise((resolve) => setTimeout(resolve, 500));
-
-    // Check if email already exists
-    const demoUser = demoUsers.find((u) => u.email.toLowerCase() === email.toLowerCase());
-    if (demoUser) {
-      return { success: false, error: "Email already registered" };
-    }
-
-    const registeredUsers = JSON.parse(localStorage.getItem("cte_registered_users") || "[]");
-    const existingUser = registeredUsers.find((u: User) => u.email.toLowerCase() === email.toLowerCase());
-    if (existingUser) {
-      return { success: false, error: "Email already registered" };
-    }
-
-    // Create new user
-    const newUser: User & { password: string } = {
-      id: `user-${Date.now()}`,
-      email,
-      fullName,
-      isSubscribed: false,
-      password,
-    };
-
-    registeredUsers.push(newUser);
-    localStorage.setItem("cte_registered_users", JSON.stringify(registeredUsers));
-
-    const { password: _, ...userWithoutPassword } = newUser;
-    setUser(userWithoutPassword);
-    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(userWithoutPassword));
-
+    
     return { success: true };
   };
 
-  const signOut = () => {
+  const signUp = async (email: string, password: string, fullName: string): Promise<{ success: boolean; error?: string }> => {
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: { full_name: fullName },
+      },
+    });
+    
+    if (error) {
+      return { success: false, error: error.message };
+    }
+    
+    return { success: true };
+  };
+
+  const signOut = async () => {
+    await supabase.auth.signOut();
     setUser(null);
-    localStorage.removeItem(AUTH_STORAGE_KEY);
+    setSession(null);
   };
 
   return (
     <AuthContext.Provider
       value={{
         user,
+        session,
         isLoading,
         signIn,
         signUp,
         signOut,
         isSubscribed: user?.isSubscribed ?? false,
+        isAdmin: user?.isAdmin ?? false,
+        refreshSubscription,
       }}
     >
       {children}
