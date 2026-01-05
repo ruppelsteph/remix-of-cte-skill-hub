@@ -27,7 +27,7 @@ const Pricing = () => {
               <h3 className="text-xl font-semibold text-card-foreground mb-2">Monthly</h3>
               <p className="text-muted-foreground text-sm mb-6">For individuals exploring CTE</p>
               <div className="mb-6">
-                <span className="text-4xl font-bold text-card-foreground">$14.99</span>
+                <span className="text-4xl font-bold text-card-foreground">$49.99</span>
                 <span className="text-muted-foreground">/month</span>
               </div>
               <ul className="space-y-3 mb-8">
@@ -54,11 +54,11 @@ const Pricing = () => {
                 Best Value
               </div>
               <h3 className="text-xl font-semibold text-card-foreground mb-2">Annual</h3>
-              <p className="text-muted-foreground text-sm mb-6">Save 33% with yearly billing</p>
+              <p className="text-muted-foreground text-sm mb-6">Save 20% with yearly billing</p>
               <div className="mb-6">
-                <span className="text-4xl font-bold text-card-foreground">$9.99</span>
+                <span className="text-4xl font-bold text-card-foreground">$39.99</span>
                 <span className="text-muted-foreground">/month</span>
-                <p className="text-sm text-muted-foreground mt-1">Billed annually at $119.88</p>
+                <p className="text-sm text-muted-foreground mt-1">Billed annually at $479.99</p>
               </div>
               <ul className="space-y-3 mb-8">
                 {[
