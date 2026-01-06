@@ -2,11 +2,11 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import {
   Table,
@@ -25,7 +25,49 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Loader2, Plus, Pencil, Trash2, FolderOpen } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Loader2, Plus, Pencil, Trash2, FolderOpen,
+  GraduationCap, Wrench, Stethoscope, Scale, Building2,
+  Leaf, Palette, Cpu, Car, Utensils, Factory, Hammer, Heart
+} from "lucide-react";
+
+const iconOptions = [
+  { name: "GraduationCap", icon: GraduationCap },
+  { name: "Wrench", icon: Wrench },
+  { name: "Stethoscope", icon: Stethoscope },
+  { name: "Scale", icon: Scale },
+  { name: "Building2", icon: Building2 },
+  { name: "Leaf", icon: Leaf },
+  { name: "Palette", icon: Palette },
+  { name: "Cpu", icon: Cpu },
+  { name: "Car", icon: Car },
+  { name: "Utensils", icon: Utensils },
+  { name: "Factory", icon: Factory },
+  { name: "Hammer", icon: Hammer },
+  { name: "Heart", icon: Heart },
+];
+
+const colorGradientOptions = [
+  { name: "Orange Glow", value: "from-orange-500 to-orange-600" },
+  { name: "Blue Ocean", value: "from-blue-500 to-blue-600" },
+  { name: "Green Forest", value: "from-green-500 to-green-600" },
+  { name: "Purple Twilight", value: "from-purple-500 to-purple-600" },
+  { name: "Red Sunset", value: "from-red-500 to-red-600" },
+  { name: "Teal Wave", value: "from-teal-500 to-teal-600" },
+  { name: "Pink Blossom", value: "from-pink-500 to-pink-600" },
+  { name: "Indigo Night", value: "from-indigo-500 to-indigo-600" },
+  { name: "Amber Gold", value: "from-amber-500 to-amber-600" },
+  { name: "Cyan Sky", value: "from-cyan-500 to-cyan-600" },
+  { name: "Rose Dawn", value: "from-rose-500 to-rose-600" },
+  { name: "Slate Steel", value: "from-slate-500 to-slate-600" },
+];
 
 interface PathwayData {
   id: string;
@@ -162,10 +204,10 @@ export function AdminPathways() {
     }
   };
 
-  const iconOptions = [
-    "GraduationCap", "Wrench", "Stethoscope", "Scale", "Building2",
-    "Leaf", "Palette", "Cpu", "Car", "Utensils"
-  ];
+  const getIconComponent = (iconName: string) => {
+    const found = iconOptions.find((opt) => opt.name === iconName);
+    return found?.icon || GraduationCap;
+  };
 
   return (
     <Card>
@@ -211,25 +253,61 @@ export function AdminPathways() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="icon">Icon</Label>
-                    <select
-                      id="icon"
+                    <Select
                       value={formData.icon}
-                      onChange={(e) => setFormData({ ...formData, icon: e.target.value })}
-                      className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm"
+                      onValueChange={(value) => setFormData({ ...formData, icon: value })}
                     >
-                      {iconOptions.map((icon) => (
-                        <option key={icon} value={icon}>{icon}</option>
-                      ))}
-                    </select>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select an icon">
+                          <span className="flex items-center gap-2">
+                            {(() => {
+                              const IconComp = getIconComponent(formData.icon);
+                              return <IconComp className="h-4 w-4" />;
+                            })()}
+                            {formData.icon}
+                          </span>
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {iconOptions.map((opt) => {
+                          const IconComp = opt.icon;
+                          return (
+                            <SelectItem key={opt.name} value={opt.name}>
+                              <span className="flex items-center gap-2">
+                                <IconComp className="h-4 w-4" />
+                                {opt.name}
+                              </span>
+                            </SelectItem>
+                          );
+                        })}
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div>
                     <Label htmlFor="color">Color Gradient</Label>
-                    <Input
-                      id="color"
+                    <Select
                       value={formData.color}
-                      onChange={(e) => setFormData({ ...formData, color: e.target.value })}
-                      placeholder="from-primary to-primary/80"
-                    />
+                      onValueChange={(value) => setFormData({ ...formData, color: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a gradient">
+                          <span className="flex items-center gap-2">
+                            <span className={`w-4 h-4 rounded bg-gradient-to-r ${formData.color}`} />
+                            {colorGradientOptions.find((g) => g.value === formData.color)?.name || "Custom"}
+                          </span>
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {colorGradientOptions.map((gradient) => (
+                          <SelectItem key={gradient.value} value={gradient.value}>
+                            <span className="flex items-center gap-2">
+                              <span className={`w-4 h-4 rounded bg-gradient-to-r ${gradient.value}`} />
+                              {gradient.name}
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">

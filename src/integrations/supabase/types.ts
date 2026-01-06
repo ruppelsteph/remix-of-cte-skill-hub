@@ -276,6 +276,7 @@ export type Database = {
           is_active: boolean | null
           is_free: boolean | null
           pathway_id: string | null
+          skill_level: string | null
           thumbnail_url: string | null
           title: string
           updated_at: string
@@ -291,6 +292,7 @@ export type Database = {
           is_active?: boolean | null
           is_free?: boolean | null
           pathway_id?: string | null
+          skill_level?: string | null
           thumbnail_url?: string | null
           title: string
           updated_at?: string
@@ -306,6 +308,7 @@ export type Database = {
           is_active?: boolean | null
           is_free?: boolean | null
           pathway_id?: string | null
+          skill_level?: string | null
           thumbnail_url?: string | null
           title?: string
           updated_at?: string
