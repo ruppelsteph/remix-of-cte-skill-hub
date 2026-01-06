@@ -42,6 +42,7 @@ interface VideoData {
   video_url: string | null;
   duration: string | null;
   pathway_id: string | null;
+  skill_level?: string;
   is_free: boolean;
   is_active: boolean;
   view_count: number;
@@ -69,6 +70,7 @@ export function AdminVideos() {
     video_url: "",
     duration: "",
     pathway_id: "",
+    skill_level: "beginner",
     is_free: false,
     is_active: true,
   });
@@ -110,6 +112,7 @@ export function AdminVideos() {
       video_url: "",
       duration: "",
       pathway_id: "",
+      skill_level: "beginner",
       is_free: false,
       is_active: true,
     });
@@ -125,6 +128,7 @@ export function AdminVideos() {
       video_url: video.video_url || "",
       duration: video.duration || "",
       pathway_id: video.pathway_id || "",
+      skill_level: video.skill_level || "beginner",
       is_free: video.is_free,
       is_active: video.is_active,
     });
@@ -143,6 +147,7 @@ export function AdminVideos() {
         video_url: formData.video_url || null,
         duration: formData.duration || null,
         pathway_id: formData.pathway_id || null,
+        skill_level: formData.skill_level,
         is_free: formData.is_free,
         is_active: formData.is_active,
       };
@@ -281,6 +286,22 @@ export function AdminVideos() {
                       </SelectContent>
                     </Select>
                   </div>
+                </div>
+                <div>
+                  <Label htmlFor="skill_level">Skill Level</Label>
+                  <Select
+                    value={formData.skill_level}
+                    onValueChange={(value) => setFormData({ ...formData, skill_level: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select skill level" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="beginner">Beginner</SelectItem>
+                      <SelectItem value="intermediate">Intermediate</SelectItem>
+                      <SelectItem value="advanced">Advanced</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
