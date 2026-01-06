@@ -265,14 +265,14 @@ export function AdminVideos() {
                   <div>
                     <Label htmlFor="pathway">Pathway</Label>
                     <Select
-                      value={formData.pathway_id}
-                      onValueChange={(value) => setFormData({ ...formData, pathway_id: value })}
+                      value={formData.pathway_id || "none"}
+                      onValueChange={(value) => setFormData({ ...formData, pathway_id: value === "none" ? "" : value })}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Select pathway" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">None</SelectItem>
+                        <SelectItem value="none">None</SelectItem>
                         {pathways.map((p) => (
                           <SelectItem key={p.id} value={p.id}>
                             {p.title}
