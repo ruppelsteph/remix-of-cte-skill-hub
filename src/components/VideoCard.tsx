@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Clock, Play } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -12,6 +13,7 @@ interface VideoCardProps {
 }
 
 export function VideoCard({ video, pathway, category, index = 0 }: VideoCardProps) {
+  const [imageError, setImageError] = useState(false);
   // Parse duration from string format (e.g., "18:30" or "18 min")
   const getDurationDisplay = () => {
     if (!video.duration) return null;
@@ -28,11 +30,12 @@ export function VideoCard({ video, pathway, category, index = 0 }: VideoCardProp
     >
       {/* Thumbnail */}
       <div className="relative aspect-video overflow-hidden bg-muted">
-        {video.thumbnail_url ? (
+        {video.thumbnail_url && !imageError ? (
           <img
             src={video.thumbnail_url}
             alt={video.title}
             className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+            onError={() => setImageError(true)}
           />
         ) : (
           <div className="h-full w-full flex items-center justify-center bg-muted">
