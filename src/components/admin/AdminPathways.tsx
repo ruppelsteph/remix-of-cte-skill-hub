@@ -347,16 +347,33 @@ export function AdminPathways() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead>Icon</TableHead>
                   <TableHead>Title</TableHead>
+                  <TableHead>Color</TableHead>
                   <TableHead>Videos</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {pathways.map((pathway) => (
+                {pathways.map((pathway) => {
+                  const IconComp = getIconComponent(pathway.icon || "GraduationCap");
+                  return (
                   <TableRow key={pathway.id}>
+                    <TableCell>
+                      <div className={`w-8 h-8 rounded-lg bg-gradient-to-r ${pathway.color || "from-primary to-primary/80"} flex items-center justify-center`}>
+                        <IconComp className="h-4 w-4 text-white" />
+                      </div>
+                    </TableCell>
                     <TableCell className="font-medium">{pathway.title}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <span className={`w-6 h-6 rounded bg-gradient-to-r ${pathway.color || "from-primary to-primary/80"}`} />
+                        <span className="text-sm text-muted-foreground">
+                          {colorGradientOptions.find((g) => g.value === pathway.color)?.name || "Custom"}
+                        </span>
+                      </div>
+                    </TableCell>
                     <TableCell>{pathway.video_count}</TableCell>
                     <TableCell>
                       <Badge variant={pathway.is_active ? "default" : "secondary"}>
@@ -381,7 +398,8 @@ export function AdminPathways() {
                       </Button>
                     </TableCell>
                   </TableRow>
-                ))}
+                  );
+                })}
               </TableBody>
             </Table>
           </div>
