@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Clock, Play } from "lucide-react";
+import { Clock, Play, Signal } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import type { Tables } from "@/integrations/supabase/types";
@@ -14,10 +14,31 @@ interface VideoCardProps {
 
 export function VideoCard({ video, pathway, category, index = 0 }: VideoCardProps) {
   const [imageError, setImageError] = useState(false);
+  
   // Parse duration from string format (e.g., "18:30" or "18 min")
   const getDurationDisplay = () => {
     if (!video.duration) return null;
     return video.duration;
+  };
+
+  const getSkillLevelLabel = () => {
+    const level = (video as any).skill_level;
+    if (!level) return null;
+    return level.charAt(0).toUpperCase() + level.slice(1);
+  };
+
+  const getSkillLevelVariant = () => {
+    const level = (video as any).skill_level;
+    switch (level) {
+      case "beginner":
+        return "bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300";
+      case "intermediate":
+        return "bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300";
+      case "advanced":
+        return "bg-rose-100 text-rose-700 dark:bg-rose-900 dark:text-rose-300";
+      default:
+        return "";
+    }
   };
 
   return (
@@ -74,6 +95,12 @@ export function VideoCard({ video, pathway, category, index = 0 }: VideoCardProp
           {category && (
             <Badge variant="outline" className="text-xs">
               {category.name}
+            </Badge>
+          )}
+          {getSkillLevelLabel() && (
+            <Badge className={cn("text-xs", getSkillLevelVariant())}>
+              <Signal className="h-3 w-3 mr-1" />
+              {getSkillLevelLabel()}
             </Badge>
           )}
         </div>
