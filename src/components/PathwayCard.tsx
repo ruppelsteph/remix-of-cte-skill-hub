@@ -6,9 +6,13 @@ import {
   UtensilsCrossed,
   HardHat,
   Car,
+  GraduationCap,
+  Wrench,
+  Briefcase,
+  Heart,
 } from "lucide-react";
-import { CTEPathway } from "@/data/mockData";
 import { cn } from "@/lib/utils";
+import type { Tables } from "@/integrations/supabase/types";
 
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   Stethoscope,
@@ -17,15 +21,19 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   UtensilsCrossed,
   HardHat,
   Car,
+  GraduationCap,
+  Wrench,
+  Briefcase,
+  Heart,
 };
 
 interface PathwayCardProps {
-  pathway: CTEPathway;
+  pathway: Tables<"pathways">;
   index?: number;
 }
 
 export function PathwayCard({ pathway, index = 0 }: PathwayCardProps) {
-  const IconComponent = iconMap[pathway.icon] || Monitor;
+  const IconComponent = iconMap[pathway.icon || "GraduationCap"] || GraduationCap;
 
   return (
     <Link
@@ -41,13 +49,15 @@ export function PathwayCard({ pathway, index = 0 }: PathwayCardProps) {
         </div>
         <div className="flex-1 min-w-0">
           <h3 className="font-heading font-semibold text-lg group-hover:text-primary transition-colors">
-            {pathway.name}
+            {pathway.title}
           </h3>
-          <p className="mt-1 text-sm text-muted-foreground line-clamp-2">
-            {pathway.description}
-          </p>
+          {pathway.description && (
+            <p className="mt-1 text-sm text-muted-foreground line-clamp-2">
+              {pathway.description}
+            </p>
+          )}
           <p className="mt-3 text-xs font-medium text-primary">
-            {pathway.videoCount} videos available
+            {pathway.video_count || 0} videos available
           </p>
         </div>
       </div>

@@ -1,11 +1,11 @@
 import { useState, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Search, Filter, X } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { Search, Filter, X, Loader2 } from "lucide-react";
 import { Layout } from "@/components/layout/Layout";
 import { VideoCard } from "@/components/VideoCard";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -13,14 +13,54 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { videos, ctePathways, videoCategories } from "@/data/mockData";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function Videos() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [searchQuery, setSearchQuery] = useState(searchParams.get("q") || "");
   const [selectedPathway, setSelectedPathway] = useState(searchParams.get("pathway") || "all");
   const [selectedCategory, setSelectedCategory] = useState(searchParams.get("category") || "all");
-  const [selectedLevel, setSelectedLevel] = useState(searchParams.get("level") || "all");
+
+  // Fetch videos from Supabase
+  const { data: videos = [], isLoading: videosLoading } = useQuery({
+    queryKey: ["videos"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("videos")
+        .select("*")
+        .eq("is_active", true)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Fetch pathways from Supabase
+  const { data: pathways = [] } = useQuery({
+    queryKey: ["pathways"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("pathways")
+        .select("*")
+        .eq("is_active", true)
+        .order("title");
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Fetch categories from Supabase
+  const { data: categories = [] } = useQuery({
+    queryKey: ["video_categories"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("video_categories")
+        .select("*")
+        .order("name");
+      if (error) throw error;
+      return data;
+    },
+  });
 
   const filteredVideos = useMemo(() => {
     return videos.filter((video) => {
@@ -29,41 +69,35 @@ export default function Videos() {
         const query = searchQuery.toLowerCase();
         if (
           !video.title.toLowerCase().includes(query) &&
-          !video.description.toLowerCase().includes(query)
+          !(video.description || "").toLowerCase().includes(query)
         ) {
           return false;
         }
       }
 
       // Pathway filter
-      if (selectedPathway !== "all" && video.pathwayId !== selectedPathway) {
+      if (selectedPathway !== "all" && video.pathway_id !== selectedPathway) {
         return false;
       }
 
       // Category filter
-      if (selectedCategory !== "all" && !video.categoryIds.includes(selectedCategory)) {
-        return false;
-      }
-
-      // Level filter
-      if (selectedLevel !== "all" && video.level !== selectedLevel) {
+      if (selectedCategory !== "all" && video.category_id !== selectedCategory) {
         return false;
       }
 
       return true;
     });
-  }, [searchQuery, selectedPathway, selectedCategory, selectedLevel]);
+  }, [videos, searchQuery, selectedPathway, selectedCategory]);
 
   const clearFilters = () => {
     setSearchQuery("");
     setSelectedPathway("all");
     setSelectedCategory("all");
-    setSelectedLevel("all");
     setSearchParams({});
   };
 
   const hasActiveFilters =
-    searchQuery || selectedPathway !== "all" || selectedCategory !== "all" || selectedLevel !== "all";
+    searchQuery || selectedPathway !== "all" || selectedCategory !== "all";
 
   return (
     <Layout>
@@ -104,9 +138,9 @@ export default function Videos() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Pathways</SelectItem>
-                  {ctePathways.map((pathway) => (
+                  {pathways.map((pathway) => (
                     <SelectItem key={pathway.id} value={pathway.id}>
-                      {pathway.name}
+                      {pathway.title}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -118,23 +152,11 @@ export default function Videos() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Categories</SelectItem>
-                  {videoCategories.map((category) => (
+                  {categories.map((category) => (
                     <SelectItem key={category.id} value={category.id}>
                       {category.name}
                     </SelectItem>
                   ))}
-                </SelectContent>
-              </Select>
-
-              <Select value={selectedLevel} onValueChange={setSelectedLevel}>
-                <SelectTrigger className="w-[140px]">
-                  <SelectValue placeholder="Level" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Levels</SelectItem>
-                  <SelectItem value="beginner">Beginner</SelectItem>
-                  <SelectItem value="intermediate">Intermediate</SelectItem>
-                  <SelectItem value="advanced">Advanced</SelectItem>
                 </SelectContent>
               </Select>
 
@@ -153,10 +175,20 @@ export default function Videos() {
           </div>
 
           {/* Video Grid */}
-          {filteredVideos.length > 0 ? (
+          {videosLoading ? (
+            <div className="py-16 flex justify-center">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          ) : filteredVideos.length > 0 ? (
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {filteredVideos.map((video, index) => (
-                <VideoCard key={video.id} video={video} index={index} />
+                <VideoCard 
+                  key={video.id} 
+                  video={video} 
+                  pathway={pathways.find(p => p.id === video.pathway_id)}
+                  category={categories.find(c => c.id === video.category_id)}
+                  index={index} 
+                />
               ))}
             </div>
           ) : (

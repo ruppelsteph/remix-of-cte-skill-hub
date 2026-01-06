@@ -1,13 +1,54 @@
 import { Link } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { Layout } from "@/components/layout/Layout";
 import { PathwayCard } from "@/components/PathwayCard";
 import { VideoCard } from "@/components/VideoCard";
 import { Button } from "@/components/ui/button";
-import { ctePathways, videos } from "@/data/mockData";
-import { Play, Users, Award, BookOpen, ArrowRight, CheckCircle } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { Play, Users, Award, BookOpen, ArrowRight, CheckCircle, Loader2 } from "lucide-react";
 
 const Index = () => {
-  const featuredVideos = videos.slice(0, 4);
+  // Fetch featured videos from Supabase
+  const { data: videos = [], isLoading: videosLoading } = useQuery({
+    queryKey: ["featured-videos"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("videos")
+        .select("*")
+        .eq("is_active", true)
+        .order("created_at", { ascending: false })
+        .limit(4);
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Fetch pathways from Supabase
+  const { data: pathways = [], isLoading: pathwaysLoading } = useQuery({
+    queryKey: ["pathways"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("pathways")
+        .select("*")
+        .eq("is_active", true)
+        .order("title");
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Fetch categories for VideoCard
+  const { data: categories = [] } = useQuery({
+    queryKey: ["video_categories"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("video_categories")
+        .select("*")
+        .order("name");
+      if (error) throw error;
+      return data;
+    },
+  });
 
   return (
     <Layout>
@@ -78,11 +119,19 @@ const Index = () => {
               Comprehensive video training aligned with industry standards across all major Career & Technical Education pathways.
             </p>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {ctePathways.map((pathway) => (
-              <PathwayCard key={pathway.id} pathway={pathway} />
-            ))}
-          </div>
+          {pathwaysLoading ? (
+            <div className="flex justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          ) : pathways.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {pathways.map((pathway) => (
+                <PathwayCard key={pathway.id} pathway={pathway} />
+              ))}
+            </div>
+          ) : (
+            <p className="text-center text-muted-foreground">No pathways available yet.</p>
+          )}
           <div className="text-center mt-10">
             <Button asChild variant="outline" size="lg">
               <Link to="/pathways">
@@ -165,11 +214,25 @@ const Index = () => {
               </Link>
             </Button>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {featuredVideos.map((video) => (
-              <VideoCard key={video.id} video={video} />
-            ))}
-          </div>
+          {videosLoading ? (
+            <div className="flex justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          ) : videos.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              {videos.map((video, index) => (
+                <VideoCard 
+                  key={video.id} 
+                  video={video}
+                  pathway={pathways.find(p => p.id === video.pathway_id)}
+                  category={categories.find(c => c.id === video.category_id)}
+                  index={index}
+                />
+              ))}
+            </div>
+          ) : (
+            <p className="text-center text-muted-foreground py-8">No videos available yet.</p>
+          )}
         </div>
       </section>
 
