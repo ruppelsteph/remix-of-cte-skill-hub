@@ -37,19 +37,6 @@ const Index = () => {
     },
   });
 
-  // Fetch categories for VideoCard
-  const { data: categories = [] } = useQuery({
-    queryKey: ["video_categories"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("video_categories")
-        .select("*")
-        .order("name");
-      if (error) throw error;
-      return data;
-    },
-  });
-
   return (
     <Layout>
       {/* Hero Section */}
@@ -170,7 +157,7 @@ const Index = () => {
               </div>
               <h3 className="text-lg font-semibold text-card-foreground mb-2">Teacher-Friendly</h3>
               <p className="text-muted-foreground text-sm">
-                Easy to integrate into your curriculum with organized pathways and categories.
+                Easy to integrate into your curriculum with organized pathways.
               </p>
             </div>
             <div className="bg-card rounded-xl p-6 shadow-sm border border-border">
@@ -225,7 +212,6 @@ const Index = () => {
                   key={video.id} 
                   video={video}
                   pathway={pathways.find(p => p.id === video.pathway_id)}
-                  category={categories.find(c => c.id === video.category_id)}
                   index={index}
                 />
               ))}

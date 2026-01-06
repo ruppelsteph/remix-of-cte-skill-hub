@@ -19,7 +19,6 @@ export default function Videos() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [searchQuery, setSearchQuery] = useState(searchParams.get("q") || "");
   const [selectedPathway, setSelectedPathway] = useState(searchParams.get("pathway") || "all");
-  const [selectedCategory, setSelectedCategory] = useState(searchParams.get("category") || "all");
 
   // Fetch videos from Supabase
   const { data: videos = [], isLoading: videosLoading } = useQuery({
@@ -49,19 +48,6 @@ export default function Videos() {
     },
   });
 
-  // Fetch categories from Supabase
-  const { data: categories = [] } = useQuery({
-    queryKey: ["video_categories"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("video_categories")
-        .select("*")
-        .order("name");
-      if (error) throw error;
-      return data;
-    },
-  });
-
   const filteredVideos = useMemo(() => {
     return videos.filter((video) => {
       // Search query
@@ -80,24 +66,17 @@ export default function Videos() {
         return false;
       }
 
-      // Category filter
-      if (selectedCategory !== "all" && video.category_id !== selectedCategory) {
-        return false;
-      }
-
       return true;
     });
-  }, [videos, searchQuery, selectedPathway, selectedCategory]);
+  }, [videos, searchQuery, selectedPathway]);
 
   const clearFilters = () => {
     setSearchQuery("");
     setSelectedPathway("all");
-    setSelectedCategory("all");
     setSearchParams({});
   };
 
-  const hasActiveFilters =
-    searchQuery || selectedPathway !== "all" || selectedCategory !== "all";
+  const hasActiveFilters = searchQuery || selectedPathway !== "all";
 
   return (
     <Layout>
@@ -146,20 +125,6 @@ export default function Videos() {
                 </SelectContent>
               </Select>
 
-              <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Category" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Categories</SelectItem>
-                  {categories.map((category) => (
-                    <SelectItem key={category.id} value={category.id}>
-                      {category.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
               {hasActiveFilters && (
                 <Button variant="ghost" size="sm" onClick={clearFilters} className="gap-1">
                   <X className="h-4 w-4" />
@@ -186,7 +151,6 @@ export default function Videos() {
                   key={video.id} 
                   video={video} 
                   pathway={pathways.find(p => p.id === video.pathway_id)}
-                  category={categories.find(c => c.id === video.category_id)}
                   index={index} 
                 />
               ))}
