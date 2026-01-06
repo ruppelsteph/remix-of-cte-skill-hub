@@ -41,18 +41,6 @@ export default function VideoDetail() {
     },
   });
 
-  // Fetch all categories
-  const { data: categories = [] } = useQuery({
-    queryKey: ["video_categories"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("video_categories")
-        .select("*");
-      if (error) throw error;
-      return data;
-    },
-  });
-
   // Fetch related videos (same pathway)
   const { data: relatedVideos = [] } = useQuery({
     queryKey: ["related-videos", video?.pathway_id, id],
@@ -95,7 +83,6 @@ export default function VideoDetail() {
   }
 
   const pathway = pathways.find(p => p.id === video.pathway_id);
-  const category = categories.find(c => c.id === video.category_id);
 
   // Check if user can access video (subscribed or video is free)
   const canWatch = isSubscribed || video.is_free;
@@ -205,9 +192,6 @@ export default function VideoDetail() {
                   {pathway && (
                     <Badge variant="secondary">{pathway.title}</Badge>
                   )}
-                  {category && (
-                    <Badge variant="outline">{category.name}</Badge>
-                  )}
                   {video.is_free && (
                     <Badge className="bg-success text-success-foreground">Free</Badge>
                   )}
@@ -278,7 +262,6 @@ export default function VideoDetail() {
                     key={relVideo.id} 
                     video={relVideo}
                     pathway={pathways.find(p => p.id === relVideo.pathway_id)}
-                    category={categories.find(c => c.id === relVideo.category_id)}
                     index={index} 
                   />
                 ))}
