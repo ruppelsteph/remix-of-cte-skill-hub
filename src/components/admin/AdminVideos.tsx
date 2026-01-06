@@ -32,7 +32,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, Plus, Pencil, Trash2, Video } from "lucide-react";
+import { Loader2, Plus, Pencil, Trash2, Video, Filter, X } from "lucide-react";
 
 interface VideoData {
   id: string;
@@ -61,6 +61,7 @@ export function AdminVideos() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingVideo, setEditingVideo] = useState<VideoData | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [filterPathway, setFilterPathway] = useState<string>("all");
   const { toast } = useToast();
 
   const [formData, setFormData] = useState({
@@ -197,6 +198,18 @@ export function AdminVideos() {
       });
     }
   };
+
+  const getPathwayTitle = (pathwayId: string | null) => {
+    if (!pathwayId) return "—";
+    const pathway = pathways.find((p) => p.id === pathwayId);
+    return pathway?.title || "—";
+  };
+
+  const filteredVideos = filterPathway === "all"
+    ? videos
+    : filterPathway === "none"
+    ? videos.filter((v) => !v.pathway_id)
+    : videos.filter((v) => v.pathway_id === filterPathway);
 
   return (
     <Card>
@@ -336,14 +349,41 @@ export function AdminVideos() {
         </CardTitle>
       </CardHeader>
       <CardContent>
+        {/* Filter Section */}
+        <div className="flex items-center gap-4 mb-4">
+          <div className="flex items-center gap-2">
+            <Filter className="h-4 w-4 text-muted-foreground" />
+            <Select value={filterPathway} onValueChange={setFilterPathway}>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Filter by pathway" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Pathways</SelectItem>
+                <SelectItem value="none">No Pathway</SelectItem>
+                {pathways.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.title}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          {filterPathway !== "all" && (
+            <Button variant="ghost" size="sm" onClick={() => setFilterPathway("all")}>
+              <X className="h-4 w-4 mr-1" />
+              Clear
+            </Button>
+          )}
+        </div>
+
         {isLoading ? (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
           </div>
-        ) : videos.length === 0 ? (
+        ) : filteredVideos.length === 0 ? (
           <div className="text-center py-12">
             <Video className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-            <p className="text-muted-foreground">No videos yet. Add your first video!</p>
+            <p className="text-muted-foreground">No videos found</p>
           </div>
         ) : (
           <div className="rounded-md border">
@@ -351,6 +391,7 @@ export function AdminVideos() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Title</TableHead>
+                  <TableHead>Pathway</TableHead>
                   <TableHead>Duration</TableHead>
                   <TableHead>Views</TableHead>
                   <TableHead>Status</TableHead>
@@ -358,7 +399,7 @@ export function AdminVideos() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {videos.map((video) => (
+                {filteredVideos.map((video) => (
                   <TableRow key={video.id}>
                     <TableCell>
                       <div>
@@ -368,6 +409,7 @@ export function AdminVideos() {
                         )}
                       </div>
                     </TableCell>
+                    <TableCell>{getPathwayTitle(video.pathway_id)}</TableCell>
                     <TableCell>{video.duration || "-"}</TableCell>
                     <TableCell>{video.view_count}</TableCell>
                     <TableCell>
