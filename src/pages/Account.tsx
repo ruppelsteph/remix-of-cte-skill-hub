@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { Layout } from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
@@ -11,8 +11,9 @@ import { format } from "date-fns";
 const Account = () => {
   const { user, isLoading, signOut, isSubscribed, isAdmin, refreshSubscription } = useAuth();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { toast } = useToast();
+  const hasHandledSuccess = useRef(false);
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -20,16 +21,19 @@ const Account = () => {
     }
   }, [user, isLoading, navigate]);
 
-  // Check for success parameter and refresh subscription
+  // Check for success parameter and refresh subscription (only once)
   useEffect(() => {
-    if (searchParams.get("success") === "true") {
+    if (searchParams.get("success") === "true" && !hasHandledSuccess.current) {
+      hasHandledSuccess.current = true;
       toast({
         title: "Payment successful!",
         description: "Your subscription is now active.",
       });
       refreshSubscription();
+      // Clear the success param from URL to prevent re-triggering
+      setSearchParams({}, { replace: true });
     }
-  }, [searchParams, refreshSubscription, toast]);
+  }, [searchParams, setSearchParams, refreshSubscription, toast]);
 
   const handleManageSubscription = async () => {
     try {
