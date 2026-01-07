@@ -1,9 +1,62 @@
-import { Link } from "react-router-dom";
+import { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { Layout } from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
-import { CheckCircle, ArrowRight } from "lucide-react";
+import { CheckCircle, ArrowRight, Loader2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+
+// These should match your Stripe price IDs
+const PRICE_IDS = {
+  monthly: "price_monthly", // Replace with actual Stripe price ID
+  annual: "price_annual",   // Replace with actual Stripe price ID
+};
 
 const Pricing = () => {
+  const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
+  const navigate = useNavigate();
+  const { toast } = useToast();
+
+  const handleCheckout = async (priceId: string, planName: string) => {
+    setLoadingPlan(planName);
+    
+    try {
+      // Check if user is authenticated
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        // Redirect to auth with return URL
+        navigate(`/auth?mode=signup&redirect=/pricing&plan=${planName}`);
+        return;
+      }
+
+      // Call the create-checkout edge function
+      const { data, error } = await supabase.functions.invoke('create-checkout', {
+        body: { priceId },
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      if (data?.url) {
+        // Redirect to Stripe Checkout
+        window.location.href = data.url;
+      } else {
+        throw new Error("No checkout URL returned");
+      }
+    } catch (error) {
+      console.error("Checkout error:", error);
+      toast({
+        title: "Checkout Error",
+        description: error instanceof Error ? error.message : "Failed to start checkout. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingPlan(null);
+    }
+  };
+
   return (
     <Layout>
       {/* Hero */}
@@ -43,8 +96,20 @@ const Pricing = () => {
                   </li>
                 ))}
               </ul>
-              <Button asChild variant="outline" className="w-full">
-                <Link to="/auth?mode=signup">Get Started</Link>
+              <Button 
+                variant="outline" 
+                className="w-full"
+                onClick={() => handleCheckout(PRICE_IDS.monthly, "monthly")}
+                disabled={loadingPlan !== null}
+              >
+                {loadingPlan === "monthly" ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  "Get Started"
+                )}
               </Button>
             </div>
 
@@ -74,8 +139,19 @@ const Pricing = () => {
                   </li>
                 ))}
               </ul>
-              <Button asChild className="w-full">
-                <Link to="/auth?mode=signup">Get Started</Link>
+              <Button 
+                className="w-full"
+                onClick={() => handleCheckout(PRICE_IDS.annual, "annual")}
+                disabled={loadingPlan !== null}
+              >
+                {loadingPlan === "annual" ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  "Get Started"
+                )}
               </Button>
             </div>
 
@@ -155,11 +231,22 @@ const Pricing = () => {
           <p className="text-muted-foreground mb-8 max-w-xl mx-auto">
             Join thousands of students and educators already using CTE Skills.
           </p>
-          <Button asChild size="lg">
-            <Link to="/auth?mode=signup">
-              Start Learning Today
-              <ArrowRight className="ml-2 h-5 w-5" />
-            </Link>
+          <Button 
+            size="lg"
+            onClick={() => handleCheckout(PRICE_IDS.annual, "annual")}
+            disabled={loadingPlan !== null}
+          >
+            {loadingPlan === "annual" ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Processing...
+              </>
+            ) : (
+              <>
+                Start Learning Today
+                <ArrowRight className="ml-2 h-5 w-5" />
+              </>
+            )}
           </Button>
         </div>
       </section>
