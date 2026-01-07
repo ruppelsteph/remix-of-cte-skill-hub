@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import Stripe from "https://esm.sh/stripe@18.5.0";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import Stripe from "https://esm.sh/v135/stripe@18.5.0?target=deno";
+import { createClient } from "https://esm.sh/v135/@supabase/supabase-js@2.57.2?target=deno";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -69,11 +69,26 @@ serve(async (req) => {
 
     if (hasActiveSub) {
       const subscription = subscriptions.data[0];
-      subscriptionEnd = new Date(subscription.current_period_end * 1000).toISOString();
-      logStep("Active subscription found", { subscriptionId: subscription.id, endDate: subscriptionEnd });
-      productId = subscription.items.data[0].price.product as string;
-      priceId = subscription.items.data[0].price.id;
-      logStep("Determined subscription tier", { productId, priceId });
+
+      // Some restricted keys / account configs can return nullable fields.
+      const rawPeriodEnd = (subscription as any).current_period_end;
+      logStep("Active subscription found", {
+        subscriptionId: subscription.id,
+        currentPeriodEnd: rawPeriodEnd,
+        currentPeriodEndType: typeof rawPeriodEnd,
+        itemsCount: subscription.items?.data?.length ?? 0,
+      });
+
+      subscriptionEnd =
+        typeof rawPeriodEnd === "number" && Number.isFinite(rawPeriodEnd)
+          ? new Date(rawPeriodEnd * 1000).toISOString()
+          : null;
+
+      const firstItem = subscription.items?.data?.[0];
+      productId = (firstItem?.price?.product as string) ?? null;
+      priceId = firstItem?.price?.id ?? null;
+
+      logStep("Determined subscription tier", { productId, priceId, subscriptionEnd });
     } else {
       logStep("No active subscription found");
     }
