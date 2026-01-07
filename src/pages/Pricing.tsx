@@ -6,10 +6,10 @@ import { CheckCircle, ArrowRight, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
-// These should match your Stripe price IDs
+// Stripe price IDs
 const PRICE_IDS = {
-  monthly: "price_monthly", // Replace with actual Stripe price ID
-  annual: "price_annual",   // Replace with actual Stripe price ID
+  monthly: "price_1SAaic4McSnLev84NI7X3yoJ",
+  annual: "price_1SAalG4McSnLev84jn52Eac4",
 };
 
 const Pricing = () => {
