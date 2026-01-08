@@ -67,10 +67,24 @@ serve(async (req) => {
     let subscriptionEnd = null;
     let priceId = null;
 
+    const toISOStringFromStripeEpoch = (value: unknown): string | null => {
+      const n = typeof value === "string" ? Number(value) : (value as number);
+      if (!Number.isFinite(n)) return null;
+
+      // Stripe is typically seconds, but some environments can return ms/µs.
+      let ms: number;
+      if (n < 1e11) ms = n * 1000; // seconds
+      else if (n < 1e14) ms = n; // milliseconds
+      else if (n < 1e17) ms = Math.floor(n / 1000); // microseconds
+      else ms = Math.floor(n / 1e6); // nanoseconds (fallback)
+
+      const d = new Date(ms);
+      return Number.isNaN(d.getTime()) ? null : d.toISOString();
+    };
+
     if (hasActiveSub) {
       const subscription = subscriptions.data[0];
 
-      // Some restricted keys / account configs can return nullable fields.
       const rawPeriodEnd = (subscription as any).current_period_end;
       logStep("Active subscription found", {
         subscriptionId: subscription.id,
@@ -79,10 +93,7 @@ serve(async (req) => {
         itemsCount: subscription.items?.data?.length ?? 0,
       });
 
-      subscriptionEnd =
-        typeof rawPeriodEnd === "number" && Number.isFinite(rawPeriodEnd)
-          ? new Date(rawPeriodEnd * 1000).toISOString()
-          : null;
+      subscriptionEnd = toISOStringFromStripeEpoch(rawPeriodEnd);
 
       const firstItem = subscription.items?.data?.[0];
       productId = (firstItem?.price?.product as string) ?? null;
