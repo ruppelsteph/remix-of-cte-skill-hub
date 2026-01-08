@@ -21,18 +21,29 @@ const Account = () => {
     }
   }, [user, isLoading, navigate]);
 
-  // Check for success parameter and refresh subscription (only once)
+  // Check for success parameter, sync subscription data, and refresh (only once)
   useEffect(() => {
-    if (searchParams.get("success") === "true" && !hasHandledSuccess.current) {
-      hasHandledSuccess.current = true;
-      toast({
-        title: "Payment successful!",
-        description: "Your subscription is now active.",
-      });
-      refreshSubscription();
-      // Clear the success param from URL to prevent re-triggering
-      setSearchParams({}, { replace: true });
-    }
+    const syncAndRefresh = async () => {
+      if (searchParams.get("success") === "true" && !hasHandledSuccess.current) {
+        hasHandledSuccess.current = true;
+        
+        // Sync subscription data from Stripe to database
+        try {
+          await supabase.functions.invoke("sync-subscription");
+        } catch (err) {
+          console.error("Error syncing subscription:", err);
+        }
+        
+        toast({
+          title: "Payment successful!",
+          description: "Your subscription is now active.",
+        });
+        await refreshSubscription();
+        // Clear the success param from URL to prevent re-triggering
+        setSearchParams({}, { replace: true });
+      }
+    };
+    syncAndRefresh();
   }, [searchParams, setSearchParams, refreshSubscription, toast]);
 
   const handleManageSubscription = async () => {
