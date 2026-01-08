@@ -81,10 +81,35 @@ serve(async (req) => {
     const priceId = firstItem?.price?.id ?? null;
     const productId = (firstItem?.price?.product as string) ?? null;
 
-    // Convert Stripe epoch to ISO string
-    const toISOString = (epoch: number) => new Date(epoch * 1000).toISOString();
-    const currentPeriodStart = toISOString(subscription.current_period_start);
-    const currentPeriodEnd = toISOString(subscription.current_period_end);
+    const toISOStringFromStripeEpoch = (value: unknown): string | null => {
+      const n = typeof value === "string" ? Number(value) : (value as number);
+      if (!Number.isFinite(n)) return null;
+
+      // Stripe is typically seconds, but some environments can return ms/µs.
+      let ms: number;
+      if (n < 1e11) ms = n * 1000; // seconds
+      else if (n < 1e14) ms = n; // milliseconds
+      else if (n < 1e17) ms = Math.floor(n / 1000); // microseconds
+      else ms = Math.floor(n / 1e6); // nanoseconds (fallback)
+
+      const d = new Date(ms);
+      return Number.isNaN(d.getTime()) ? null : d.toISOString();
+    };
+
+    const rawPeriodStart = (subscription as any).current_period_start;
+    const rawPeriodEnd = (subscription as any).current_period_end;
+
+    const currentPeriodStart = toISOStringFromStripeEpoch(rawPeriodStart);
+    const currentPeriodEnd = toISOStringFromStripeEpoch(rawPeriodEnd);
+
+    logStep("Stripe period fields", {
+      rawPeriodStart,
+      rawPeriodStartType: typeof rawPeriodStart,
+      rawPeriodEnd,
+      rawPeriodEndType: typeof rawPeriodEnd,
+      currentPeriodStart,
+      currentPeriodEnd,
+    });
 
     logStep("Subscription details", {
       subscriptionId: subscription.id,
@@ -96,20 +121,23 @@ serve(async (req) => {
     // Upsert subscription record
     const { error: subError } = await supabaseAdmin
       .from("subscriptions")
-      .upsert({
-        user_id: user.id,
-        stripe_subscription_id: subscription.id,
-        stripe_customer_id: customerId,
-        status: subscription.status,
-        price_id: priceId,
-        product_id: productId,
-        current_period_start: currentPeriodStart,
-        current_period_end: currentPeriodEnd,
-        cancel_at_period_end: subscription.cancel_at_period_end,
-        updated_at: new Date().toISOString(),
-      }, {
-        onConflict: "stripe_subscription_id",
-      });
+      .upsert(
+        {
+          user_id: user.id,
+          stripe_subscription_id: subscription.id,
+          stripe_customer_id: customerId,
+          status: subscription.status,
+          price_id: priceId,
+          product_id: productId,
+          current_period_start: currentPeriodStart,
+          current_period_end: currentPeriodEnd,
+          cancel_at_period_end: subscription.cancel_at_period_end,
+          updated_at: new Date().toISOString(),
+        },
+        {
+          onConflict: "stripe_subscription_id",
+        }
+      );
 
     if (subError) {
       logStep("Error upserting subscription", { error: subError.message });
