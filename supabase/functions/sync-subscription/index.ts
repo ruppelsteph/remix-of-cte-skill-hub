@@ -81,6 +81,18 @@ serve(async (req) => {
     const priceId = firstItem?.price?.id ?? null;
     const productId = (firstItem?.price?.product as string) ?? null;
 
+    // Fetch product name from Stripe
+    let productName: string | null = null;
+    if (productId) {
+      try {
+        const product = await stripe.products.retrieve(productId);
+        productName = product.name ?? null;
+        logStep("Fetched product name", { productId, productName });
+      } catch (e) {
+        logStep("Error fetching product", { error: (e as Error).message });
+      }
+    }
+
     const toISOStringFromStripeEpoch = (value: unknown): string | null => {
       const n = typeof value === "string" ? Number(value) : (value as number);
       if (!Number.isFinite(n)) return null;
@@ -129,6 +141,7 @@ serve(async (req) => {
           status: subscription.status,
           price_id: priceId,
           product_id: productId,
+          product_name: productName,
           current_period_start: currentPeriodStart,
           current_period_end: currentPeriodEnd,
           cancel_at_period_end: subscription.cancel_at_period_end,
