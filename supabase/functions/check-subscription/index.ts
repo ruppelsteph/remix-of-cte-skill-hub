@@ -137,6 +137,16 @@ serve(async (req) => {
 
     logStep("Fetched subscriptions", { total: subscriptions.length });
 
+    // Log each subscription's ID and status for debugging
+    subscriptions.forEach((sub, index) => {
+      logStep(`Subscription [${index}]`, {
+        subscriptionId: sub.id,
+        status: sub.status,
+        currentPeriodEnd: sub.current_period_end,
+        cancelAtPeriodEnd: sub.cancel_at_period_end
+      });
+    });
+
     // Filter to active/trialing subscriptions and pick the one with latest current_period_end
     const relevantStatuses = ["active", "trialing"];
     const relevantSubs = subscriptions.filter((sub) =>
@@ -146,6 +156,7 @@ serve(async (req) => {
     logStep("Filtered subscriptions", {
       total: subscriptions.length,
       relevant: relevantSubs.length,
+      relevantIds: relevantSubs.map(s => ({ id: s.id, status: s.status }))
     });
 
     let selectedSubscription: StripeSubscription | null = null;
@@ -160,7 +171,11 @@ serve(async (req) => {
 
     // If no active/trialing, return none status
     if (!selectedSubscription) {
-      logStep("No active or trialing subscription found");
+      logStep("No active or trialing subscription found", {
+        stripeCustomerId,
+        totalSubscriptions: subscriptions.length,
+        allStatuses: subscriptions.map(s => s.status)
+      });
       return new Response(JSON.stringify({
         subscribed: false,
         status: "none",
