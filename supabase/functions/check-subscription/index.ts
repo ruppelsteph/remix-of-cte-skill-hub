@@ -71,14 +71,12 @@ serve(async (req) => {
     if (hasActiveSub) {
       const subscription = subscriptions.data[0];
 
-      // Stripe returns Unix timestamps (seconds). Some older SDK builds may type this as optional,
-      // so log raw values and fall back to billing_cycle_anchor if needed.
+      // Stripe returns Unix timestamps (seconds). For renewal we only want current_period_end.
+      // Do NOT fall back to billing_cycle_anchor because that can look like the purchase/start date.
       const periodEndSeconds = (subscription as any).current_period_end ?? null;
-      const billingAnchorSeconds = (subscription as any).billing_cycle_anchor ?? null;
 
-      const endSeconds = periodEndSeconds ?? billingAnchorSeconds;
-      if (typeof endSeconds === "number" && Number.isFinite(endSeconds)) {
-        subscriptionEnd = new Date(endSeconds * 1000).toISOString();
+      if (typeof periodEndSeconds === "number" && Number.isFinite(periodEndSeconds)) {
+        subscriptionEnd = new Date(periodEndSeconds * 1000).toISOString();
       } else {
         subscriptionEnd = null;
       }
@@ -86,7 +84,6 @@ serve(async (req) => {
       logStep("Active subscription found", {
         subscriptionId: subscription.id,
         currentPeriodEnd: periodEndSeconds,
-        billingCycleAnchor: billingAnchorSeconds,
         subscriptionEnd,
         itemsCount: subscription.items?.data?.length ?? 0,
       });
