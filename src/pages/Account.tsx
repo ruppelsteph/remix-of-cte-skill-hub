@@ -169,14 +169,12 @@ const Account = () => {
                         <p className="text-sm text-muted-foreground mb-1">Plan</p>
                         <p className="text-sm text-foreground">{user.productName || "Subscription"}</p>
                       </div>
-                      {user.subscriptionEnd && (
-                        <div>
-                          <p className="text-sm text-muted-foreground mb-1">Auto-Renews On</p>
-                          <p className="text-sm text-foreground">
-                            {format(new Date(user.subscriptionEnd), "MMMM d, yyyy")}
-                          </p>
-                        </div>
-                      )}
+                      <div>
+                        <p className="text-sm text-muted-foreground mb-1">Auto-Renews On</p>
+                        <p className="text-sm text-foreground">
+                          {user.subscriptionEnd ? format(new Date(user.subscriptionEnd), "MMMM d, yyyy") : "—"}
+                        </p>
+                      </div>
                     </div>
                     <Button variant="outline" className="mt-4" onClick={handleManageSubscription}>
                       <Settings className="h-4 w-4 mr-2" />
