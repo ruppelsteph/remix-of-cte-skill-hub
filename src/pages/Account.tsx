@@ -1,11 +1,11 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { Layout } from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { User, CreditCard, CheckCircle, XCircle, ArrowRight, Settings, Loader2 } from "lucide-react";
+import { User, CreditCard, CheckCircle, XCircle, ArrowRight, Settings, Loader2, RefreshCw } from "lucide-react";
 import { format } from "date-fns";
 
 const Account = () => {
@@ -14,6 +14,7 @@ const Account = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const { toast } = useToast();
   const hasHandledSuccess = useRef(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -26,14 +27,14 @@ const Account = () => {
     const syncAndRefresh = async () => {
       if (searchParams.get("success") === "true" && !hasHandledSuccess.current) {
         hasHandledSuccess.current = true;
-        
+
         // Sync subscription data from Stripe to database
         try {
           await supabase.functions.invoke("sync-subscription");
         } catch (err) {
           console.error("Error syncing subscription:", err);
         }
-        
+
         toast({
           title: "Payment successful!",
           description: "Your subscription is now active.",
@@ -60,6 +61,26 @@ const Account = () => {
         title: "Error",
         description: "Failed to open subscription management.",
       });
+    }
+  };
+
+  const handleRefreshSubscription = async () => {
+    try {
+      setIsRefreshing(true);
+      await refreshSubscription();
+      toast({
+        title: "Subscription refreshed",
+        description: "Your account status has been updated.",
+      });
+    } catch (err) {
+      console.error("Error refreshing subscription:", err);
+      toast({
+        variant: "destructive",
+        title: "Refresh failed",
+        description: "Couldn't refresh subscription status. Please try again.",
+      });
+    } finally {
+      setIsRefreshing(false);
     }
   };
 
@@ -115,10 +136,28 @@ const Account = () => {
 
               {/* Subscription Status */}
               <div className="bg-card rounded-xl border border-border p-6">
-                <h3 className="text-lg font-semibold text-card-foreground mb-4 flex items-center gap-2">
-                  <CreditCard className="h-5 w-5" />
-                  Subscription
-                </h3>
+                <div className="flex items-center justify-between gap-4 mb-4">
+                  <h3 className="text-lg font-semibold text-card-foreground flex items-center gap-2">
+                    <CreditCard className="h-5 w-5" />
+                    Subscription
+                  </h3>
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleRefreshSubscription}
+                    disabled={isRefreshing}
+                  >
+                    {isRefreshing ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <RefreshCw className="h-4 w-4" />
+                    )}
+                    <span className="ml-2">Refresh</span>
+                  </Button>
+                </div>
+
                 {isSubscribed ? (
                   <div className="space-y-4">
                     <div className="flex items-center gap-2 text-green-600">
