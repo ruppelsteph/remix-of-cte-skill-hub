@@ -9,6 +9,8 @@ interface User {
   isSubscribed: boolean;
   isAdmin: boolean;
   subscriptionEnd?: string | null;
+  subscriptionEndUnix?: number | null;
+  subscriptionStatus?: string | null;
   stripeCustomerId?: string | null;
   productName?: string | null;
 }
@@ -37,17 +39,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { data, error } = await supabase.functions.invoke('check-subscription');
       if (error) {
         console.error('Error checking subscription:', error);
-        return { subscribed: false, subscriptionEnd: null, stripeCustomerId: null, productName: null };
+        return { subscribed: false, subscriptionEnd: null, subscriptionEndUnix: null, subscriptionStatus: null, stripeCustomerId: null, productName: null };
       }
       return {
         subscribed: data?.subscribed ?? false,
         subscriptionEnd: data?.subscription_end ?? null,
+        subscriptionEndUnix: data?.subscription_end_unix ?? null,
+        subscriptionStatus: data?.subscription_status ?? null,
         stripeCustomerId: data?.stripe_customer_id ?? null,
         productName: data?.product_name ?? null,
       };
     } catch (err) {
       console.error('Error invoking check-subscription:', err);
-      return { subscribed: false, subscriptionEnd: null, stripeCustomerId: null, productName: null };
+      return { subscribed: false, subscriptionEnd: null, subscriptionEndUnix: null, subscriptionStatus: null, stripeCustomerId: null, productName: null };
     }
   };
 
@@ -84,6 +88,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isSubscribed: subscriptionInfo.subscribed,
       isAdmin,
       subscriptionEnd: subscriptionInfo.subscriptionEnd,
+      subscriptionEndUnix: subscriptionInfo.subscriptionEndUnix,
+      subscriptionStatus: subscriptionInfo.subscriptionStatus,
       stripeCustomerId: subscriptionInfo.stripeCustomerId,
       productName: subscriptionInfo.productName,
     };

@@ -162,7 +162,14 @@ const Account = () => {
                   <div className="space-y-4">
                     <div className="flex items-center gap-2 text-green-600">
                       <CheckCircle className="h-5 w-5" />
-                      <span className="font-medium">Active Subscription</span>
+                      <span className="font-medium">
+                        {user.subscriptionStatus === "trialing" ? "Trial" : "Active"} Subscription
+                      </span>
+                      {user.subscriptionStatus && (
+                        <span className="ml-2 px-2 py-0.5 bg-muted text-muted-foreground text-xs font-medium rounded capitalize">
+                          {user.subscriptionStatus}
+                        </span>
+                      )}
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-border">
                       <div>
@@ -170,7 +177,9 @@ const Account = () => {
                         <p className="text-sm text-foreground">{user.productName || "Subscription"}</p>
                       </div>
                       <div>
-                        <p className="text-sm text-muted-foreground mb-1">Auto-Renews On</p>
+                        <p className="text-sm text-muted-foreground mb-1">
+                          {user.subscriptionStatus === "trialing" ? "Trial Ends On" : "Auto-Renews On"}
+                        </p>
                         <p className="text-sm text-foreground">
                           {user.subscriptionEnd ? format(new Date(user.subscriptionEnd), "MMMM d, yyyy") : "—"}
                         </p>
