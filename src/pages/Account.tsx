@@ -128,11 +128,11 @@ const Account = () => {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-border">
                       <div>
                         <p className="text-sm text-muted-foreground mb-1">Plan</p>
-                        <p className="text-sm text-foreground">CTE Skills Access</p>
+                        <p className="text-sm text-foreground">{user.productName || "Subscription"}</p>
                       </div>
                       {user.subscriptionEnd && (
                         <div>
-                          <p className="text-sm text-muted-foreground mb-1">Renews On</p>
+                          <p className="text-sm text-muted-foreground mb-1">Auto-Renews On</p>
                           <p className="text-sm text-foreground">
                             {format(new Date(user.subscriptionEnd), "MMMM d, yyyy")}
                           </p>

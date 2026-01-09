@@ -82,6 +82,8 @@ serve(async (req) => {
       return Number.isNaN(d.getTime()) ? null : d.toISOString();
     };
 
+    let productName: string | null = null;
+
     if (hasActiveSub) {
       const subscription = subscriptions.data[0];
 
@@ -99,7 +101,18 @@ serve(async (req) => {
       productId = (firstItem?.price?.product as string) ?? null;
       priceId = firstItem?.price?.id ?? null;
 
-      logStep("Determined subscription tier", { productId, priceId, subscriptionEnd });
+      // Fetch product name from Stripe
+      if (productId) {
+        try {
+          const product = await stripe.products.retrieve(productId);
+          productName = product.name ?? null;
+          logStep("Fetched product name", { productId, productName });
+        } catch (e) {
+          logStep("Error fetching product", { error: (e as Error).message });
+        }
+      }
+
+      logStep("Determined subscription tier", { productId, priceId, productName, subscriptionEnd });
     } else {
       logStep("No active subscription found");
     }
@@ -107,6 +120,7 @@ serve(async (req) => {
     return new Response(JSON.stringify({
       subscribed: hasActiveSub,
       product_id: productId,
+      product_name: productName,
       price_id: priceId,
       subscription_end: subscriptionEnd,
       stripe_customer_id: customerId
