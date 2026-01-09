@@ -10,6 +10,7 @@ interface User {
   isAdmin: boolean;
   subscriptionEnd?: string | null;
   stripeCustomerId?: string | null;
+  productName?: string | null;
 }
 
 interface AuthContextType {
@@ -36,16 +37,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { data, error } = await supabase.functions.invoke('check-subscription');
       if (error) {
         console.error('Error checking subscription:', error);
-        return { subscribed: false, subscriptionEnd: null, stripeCustomerId: null };
+        return { subscribed: false, subscriptionEnd: null, stripeCustomerId: null, productName: null };
       }
       return {
         subscribed: data?.subscribed ?? false,
         subscriptionEnd: data?.subscription_end ?? null,
         stripeCustomerId: data?.stripe_customer_id ?? null,
+        productName: data?.product_name ?? null,
       };
     } catch (err) {
       console.error('Error invoking check-subscription:', err);
-      return { subscribed: false, subscriptionEnd: null, stripeCustomerId: null };
+      return { subscribed: false, subscriptionEnd: null, stripeCustomerId: null, productName: null };
     }
   };
 
@@ -83,6 +85,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isAdmin,
       subscriptionEnd: subscriptionInfo.subscriptionEnd,
       stripeCustomerId: subscriptionInfo.stripeCustomerId,
+      productName: subscriptionInfo.productName,
     };
   };
 
