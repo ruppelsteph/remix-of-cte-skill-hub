@@ -71,15 +71,22 @@ serve(async (req) => {
     if (hasActiveSub) {
       const subscription = subscriptions.data[0];
 
-      // Get current_period_end - it's a Unix timestamp in seconds
-      if (subscription.current_period_end) {
-        const endDate = new Date(subscription.current_period_end * 1000);
-        subscriptionEnd = endDate.toISOString();
+      // Stripe returns Unix timestamps (seconds). Some older SDK builds may type this as optional,
+      // so log raw values and fall back to billing_cycle_anchor if needed.
+      const periodEndSeconds = (subscription as any).current_period_end ?? null;
+      const billingAnchorSeconds = (subscription as any).billing_cycle_anchor ?? null;
+
+      const endSeconds = periodEndSeconds ?? billingAnchorSeconds;
+      if (typeof endSeconds === "number" && Number.isFinite(endSeconds)) {
+        subscriptionEnd = new Date(endSeconds * 1000).toISOString();
+      } else {
+        subscriptionEnd = null;
       }
 
       logStep("Active subscription found", {
         subscriptionId: subscription.id,
-        currentPeriodEnd: subscription.current_period_end,
+        currentPeriodEnd: periodEndSeconds,
+        billingCycleAnchor: billingAnchorSeconds,
         subscriptionEnd,
         itemsCount: subscription.items?.data?.length ?? 0,
       });
