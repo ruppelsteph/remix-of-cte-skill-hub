@@ -57,38 +57,66 @@ serve(async (req) => {
     const customerId = customers.data[0].id;
     logStep("Found Stripe customer", { customerId });
 
+    // Fetch all subscriptions (active or trialing) to pick the most relevant one
     const subscriptions = await stripe.subscriptions.list({
       customer: customerId,
-      status: "active",
-      limit: 1,
+      limit: 100,
     });
-    const hasActiveSub = subscriptions.data.length > 0;
+
+    // Filter to active/trialing subscriptions and pick the one with latest current_period_end
+    const relevantStatuses = ["active", "trialing"];
+    const relevantSubs = subscriptions.data.filter((sub: { status: string }) =>
+      relevantStatuses.includes(sub.status)
+    );
+
+    logStep("Fetched subscriptions", {
+      total: subscriptions.data.length,
+      relevant: relevantSubs.length,
+    });
+
+    // deno-lint-ignore no-explicit-any
+    let selectedSubscription: any = null;
+    if (relevantSubs.length > 0) {
+      // Pick the one with the latest current_period_end
+      // deno-lint-ignore no-explicit-any
+      selectedSubscription = relevantSubs.reduce((best: any, current: any) => {
+        const bestEnd = best.current_period_end ?? 0;
+        const currentEnd = current.current_period_end ?? 0;
+        return currentEnd > bestEnd ? current : best;
+      });
+    }
+
+    const hasActiveSub = selectedSubscription !== null;
     let productId = null;
     let subscriptionEnd: string | null = null;
+    let subscriptionEndUnix: number | null = null;
     let priceId = null;
     let productName: string | null = null;
+    let subscriptionStatus: string | null = null;
 
-    if (hasActiveSub) {
-      const subscription = subscriptions.data[0];
+    if (hasActiveSub && selectedSubscription) {
+      subscriptionStatus = selectedSubscription.status;
 
-      // Stripe returns Unix timestamps (seconds). For renewal we only want current_period_end.
-      // Do NOT fall back to billing_cycle_anchor because that can look like the purchase/start date.
-      const periodEndSeconds = (subscription as any).current_period_end ?? null;
+      // Stripe returns Unix timestamps (seconds). Use only current_period_end for renewal date.
+      const periodEndSeconds = (selectedSubscription as any).current_period_end ?? null;
 
       if (typeof periodEndSeconds === "number" && Number.isFinite(periodEndSeconds)) {
+        subscriptionEndUnix = periodEndSeconds;
         subscriptionEnd = new Date(periodEndSeconds * 1000).toISOString();
       } else {
         subscriptionEnd = null;
+        subscriptionEndUnix = null;
       }
 
-      logStep("Active subscription found", {
-        subscriptionId: subscription.id,
+      logStep("Selected subscription", {
+        subscriptionId: selectedSubscription.id,
+        status: subscriptionStatus,
         currentPeriodEnd: periodEndSeconds,
         subscriptionEnd,
-        itemsCount: subscription.items?.data?.length ?? 0,
+        itemsCount: selectedSubscription.items?.data?.length ?? 0,
       });
 
-      const firstItem = subscription.items?.data?.[0];
+      const firstItem = selectedSubscription.items?.data?.[0];
       productId = (firstItem?.price?.product as string) ?? null;
       priceId = firstItem?.price?.id ?? null;
 
@@ -105,15 +133,17 @@ serve(async (req) => {
 
       logStep("Determined subscription tier", { productId, priceId, productName, subscriptionEnd });
     } else {
-      logStep("No active subscription found");
+      logStep("No active or trialing subscription found");
     }
 
     return new Response(JSON.stringify({
       subscribed: hasActiveSub,
+      subscription_status: subscriptionStatus,
       product_id: productId,
       product_name: productName,
       price_id: priceId,
       subscription_end: subscriptionEnd,
+      subscription_end_unix: subscriptionEndUnix,
       stripe_customer_id: customerId
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
