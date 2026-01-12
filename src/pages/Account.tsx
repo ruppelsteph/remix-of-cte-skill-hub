@@ -171,10 +171,24 @@ const Account = () => {
                         </span>
                       )}
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-border">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-border">
                       <div>
                         <p className="text-sm text-muted-foreground mb-1">Plan</p>
                         <p className="text-sm text-foreground">{user.productName || "Subscription"}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground mb-1">Price</p>
+                        <p className="text-sm text-foreground">
+                          {user.priceAmount && user.priceCurrency
+                            ? `${new Intl.NumberFormat('en-US', { style: 'currency', currency: user.priceCurrency }).format(user.priceAmount / 100)}/${user.priceInterval || 'month'}`
+                            : "—"}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground mb-1">Subscribed On</p>
+                        <p className="text-sm text-foreground">
+                          {user.subscriptionCreated ? format(new Date(user.subscriptionCreated), "MMMM d, yyyy") : "—"}
+                        </p>
                       </div>
                       <div>
                         <p className="text-sm text-muted-foreground mb-1">

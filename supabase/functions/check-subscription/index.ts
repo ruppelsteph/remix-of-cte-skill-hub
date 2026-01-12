@@ -24,6 +24,7 @@ async function stripeRequest(endpoint: string, stripeKey: string): Promise<Respo
 interface StripeSubscription {
   id: string;
   status: string;
+  created: number;
   current_period_end: number;
   cancel_at_period_end: boolean;
   items: {
@@ -31,6 +32,11 @@ interface StripeSubscription {
       price: {
         id: string;
         product: string;
+        unit_amount: number | null;
+        currency: string;
+        recurring: {
+          interval: string;
+        } | null;
       };
     }>;
   };
@@ -213,6 +219,23 @@ serve(async (req) => {
     const firstItem = selectedSubscription.items?.data?.[0];
     const productId = firstItem?.price?.product ?? null;
     const priceId = firstItem?.price?.id ?? null;
+    const priceAmount = firstItem?.price?.unit_amount ?? null;
+    const priceCurrency = firstItem?.price?.currency ?? null;
+    const priceInterval = firstItem?.price?.recurring?.interval ?? null;
+
+    // Get subscription created date (purchase date)
+    const createdUnix = selectedSubscription.created;
+    const createdIso = typeof createdUnix === "number" && Number.isFinite(createdUnix)
+      ? new Date(createdUnix * 1000).toISOString()
+      : null;
+
+    logStep("Subscription pricing details", {
+      priceAmount,
+      priceCurrency,
+      priceInterval,
+      createdUnix,
+      createdIso
+    });
 
     // Fetch product name from Stripe via native fetch
     let productName: string | null = null;
@@ -234,7 +257,11 @@ serve(async (req) => {
       priceId, 
       productName, 
       subscriptionEnd,
-      status: selectedSubscription.status
+      status: selectedSubscription.status,
+      priceAmount,
+      priceCurrency,
+      priceInterval,
+      createdIso
     });
 
     return new Response(JSON.stringify({
@@ -250,7 +277,12 @@ serve(async (req) => {
       subscription_end_unix: subscriptionEndUnix,
       product_id: productId,
       product_name: productName,
-      price_id: priceId
+      price_id: priceId,
+      price_amount: priceAmount,
+      price_currency: priceCurrency,
+      price_interval: priceInterval,
+      subscription_created: createdIso,
+      subscription_created_unix: createdUnix
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
