@@ -13,6 +13,10 @@ interface User {
   subscriptionStatus?: string | null;
   stripeCustomerId?: string | null;
   productName?: string | null;
+  priceAmount?: number | null;
+  priceCurrency?: string | null;
+  priceInterval?: string | null;
+  subscriptionCreated?: string | null;
 }
 
 interface AuthContextType {
@@ -39,7 +43,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { data, error } = await supabase.functions.invoke('check-subscription');
       if (error) {
         console.error('Error checking subscription:', error);
-        return { subscribed: false, subscriptionEnd: null, subscriptionEndUnix: null, subscriptionStatus: null, stripeCustomerId: null, productName: null };
+        return { subscribed: false, subscriptionEnd: null, subscriptionEndUnix: null, subscriptionStatus: null, stripeCustomerId: null, productName: null, priceAmount: null, priceCurrency: null, priceInterval: null, subscriptionCreated: null };
       }
       return {
         subscribed: data?.subscribed ?? false,
@@ -48,10 +52,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         subscriptionStatus: data?.subscription_status ?? null,
         stripeCustomerId: data?.stripe_customer_id ?? null,
         productName: data?.product_name ?? null,
+        priceAmount: data?.price_amount ?? null,
+        priceCurrency: data?.price_currency ?? null,
+        priceInterval: data?.price_interval ?? null,
+        subscriptionCreated: data?.subscription_created ?? null,
       };
     } catch (err) {
       console.error('Error invoking check-subscription:', err);
-      return { subscribed: false, subscriptionEnd: null, subscriptionEndUnix: null, subscriptionStatus: null, stripeCustomerId: null, productName: null };
+      return { subscribed: false, subscriptionEnd: null, subscriptionEndUnix: null, subscriptionStatus: null, stripeCustomerId: null, productName: null, priceAmount: null, priceCurrency: null, priceInterval: null, subscriptionCreated: null };
     }
   };
 
@@ -92,6 +100,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       subscriptionStatus: subscriptionInfo.subscriptionStatus,
       stripeCustomerId: subscriptionInfo.stripeCustomerId,
       productName: subscriptionInfo.productName,
+      priceAmount: subscriptionInfo.priceAmount,
+      priceCurrency: subscriptionInfo.priceCurrency,
+      priceInterval: subscriptionInfo.priceInterval,
+      subscriptionCreated: subscriptionInfo.subscriptionCreated,
     };
   };
 
