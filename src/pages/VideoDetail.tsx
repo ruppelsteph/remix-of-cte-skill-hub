@@ -28,6 +28,25 @@ export default function VideoDetail() {
     enabled: !!id,
   });
 
+  // Fetch the playable URL separately — RLS on video_sources only returns
+  // it to free viewers, active subscribers, granted users, or admins.
+  const { data: videoSource } = useQuery({
+    queryKey: ["video-source", id, user?.id, isSubscribed],
+    queryFn: async () => {
+      if (!id) return null;
+      const { data, error } = await supabase
+        .from("video_sources")
+        .select("video_url")
+        .eq("video_id", id)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!id,
+  });
+
+  const videoUrl = videoSource?.video_url ?? null;
+
   // Fetch all pathways
   const { data: pathways = [] } = useQuery({
     queryKey: ["pathways"],
