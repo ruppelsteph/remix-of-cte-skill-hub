@@ -39,7 +39,7 @@ interface VideoData {
   title: string;
   description: string | null;
   thumbnail_url: string | null;
-  video_url: string | null;
+  video_url: string | null; // populated from video_sources, not videos
   duration: string | null;
   pathway_id: string | null;
   skill_level?: string;
@@ -82,15 +82,26 @@ export function AdminVideos() {
   const fetchData = async () => {
     setIsLoading(true);
     try {
-      const [videosRes, pathwaysRes] = await Promise.all([
+      const [videosRes, pathwaysRes, sourcesRes] = await Promise.all([
         supabase.from("videos").select("*").order("created_at", { ascending: false }),
         supabase.from("pathways").select("id, title"),
+        supabase.from("video_sources").select("video_id, video_url"),
       ]);
 
       if (videosRes.error) throw videosRes.error;
       if (pathwaysRes.error) throw pathwaysRes.error;
+      if (sourcesRes.error) throw sourcesRes.error;
 
-      setVideos(videosRes.data || []);
+      const urlByVideo = new Map<string, string>(
+        (sourcesRes.data || []).map((s) => [s.video_id, s.video_url])
+      );
+
+      const merged: VideoData[] = (videosRes.data || []).map((v) => ({
+        ...v,
+        video_url: urlByVideo.get(v.id) ?? null,
+      }));
+
+      setVideos(merged);
       setPathways(pathwaysRes.data || []);
     } catch (err) {
       console.error("Error fetching data:", err);
@@ -148,7 +159,6 @@ export function AdminVideos() {
         title: formData.title,
         description: formData.description || null,
         thumbnail_url: formData.thumbnail_url || null,
-        video_url: formData.video_url || null,
         duration: formData.duration || null,
         pathway_id: formData.pathway_id || null,
         skill_level: formData.skill_level,
@@ -156,17 +166,44 @@ export function AdminVideos() {
         is_active: formData.is_active,
       };
 
+      const trimmedUrl = formData.video_url.trim();
+      let videoId: string;
+
       if (editingVideo) {
         const { error } = await supabase
           .from("videos")
           .update(videoData)
           .eq("id", editingVideo.id);
         if (error) throw error;
+        videoId = editingVideo.id;
         toast({ title: "Video updated successfully" });
       } else {
-        const { error } = await supabase.from("videos").insert([videoData]);
+        const { data: inserted, error } = await supabase
+          .from("videos")
+          .insert([videoData])
+          .select("id")
+          .single();
         if (error) throw error;
+        videoId = inserted.id;
         toast({ title: "Video created successfully" });
+      }
+
+      // Sync video_sources (separate, access-controlled table)
+      if (trimmedUrl) {
+        const { error: srcError } = await supabase
+          .from("video_sources")
+          .upsert(
+            { video_id: videoId, video_url: trimmedUrl },
+            { onConflict: "video_id" }
+          );
+        if (srcError) throw srcError;
+      } else {
+        // No URL provided — remove any existing source row
+        const { error: delError } = await supabase
+          .from("video_sources")
+          .delete()
+          .eq("video_id", videoId);
+        if (delError) throw delError;
       }
 
       setIsDialogOpen(false);

@@ -269,6 +269,38 @@ export type Database = {
         }
         Relationships: []
       }
+      video_sources: {
+        Row: {
+          created_at: string
+          id: string
+          updated_at: string
+          video_id: string
+          video_url: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          updated_at?: string
+          video_id: string
+          video_url: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          updated_at?: string
+          video_id?: string
+          video_url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "video_sources_video_id_fkey"
+            columns: ["video_id"]
+            isOneToOne: true
+            referencedRelation: "videos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       videos: {
         Row: {
           category_id: string | null
@@ -283,7 +315,6 @@ export type Database = {
           thumbnail_url: string | null
           title: string
           updated_at: string
-          video_url: string | null
           view_count: number | null
         }
         Insert: {
@@ -299,7 +330,6 @@ export type Database = {
           thumbnail_url?: string | null
           title: string
           updated_at?: string
-          video_url?: string | null
           view_count?: number | null
         }
         Update: {
@@ -315,7 +345,6 @@ export type Database = {
           thumbnail_url?: string | null
           title?: string
           updated_at?: string
-          video_url?: string | null
           view_count?: number | null
         }
         Relationships: [

@@ -28,6 +28,25 @@ export default function VideoDetail() {
     enabled: !!id,
   });
 
+  // Fetch the playable URL separately — RLS on video_sources only returns
+  // it to free viewers, active subscribers, granted users, or admins.
+  const { data: videoSource } = useQuery({
+    queryKey: ["video-source", id, user?.id, isSubscribed],
+    queryFn: async () => {
+      if (!id) return null;
+      const { data, error } = await supabase
+        .from("video_sources")
+        .select("video_url")
+        .eq("video_id", id)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!id,
+  });
+
+  const videoUrl = videoSource?.video_url ?? null;
+
   // Fetch all pathways
   const { data: pathways = [] } = useQuery({
     queryKey: ["pathways"],
@@ -107,17 +126,17 @@ export default function VideoDetail() {
               <div className="relative aspect-video rounded-xl overflow-hidden bg-secondary shadow-lg">
                 {canWatch ? (
                   // User can watch - show player
-                  video.video_url ? (
-                    video.video_url.includes("youtube.com") || video.video_url.includes("youtu.be") ? (
+                  videoUrl ? (
+                    videoUrl.includes("youtube.com") || videoUrl.includes("youtu.be") ? (
                       <iframe
-                        src={video.video_url.replace("watch?v=", "embed/").replace("youtu.be/", "youtube.com/embed/")}
+                        src={videoUrl.replace("watch?v=", "embed/").replace("youtu.be/", "youtube.com/embed/")}
                         className="h-full w-full"
                         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                         allowFullScreen
                       />
                     ) : (
                       <video
-                        src={video.video_url}
+                        src={videoUrl}
                         controls
                         className="h-full w-full"
                         poster={video.thumbnail_url || undefined}
