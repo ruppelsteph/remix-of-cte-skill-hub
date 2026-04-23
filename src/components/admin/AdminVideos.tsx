@@ -159,7 +159,6 @@ export function AdminVideos() {
         title: formData.title,
         description: formData.description || null,
         thumbnail_url: formData.thumbnail_url || null,
-        video_url: formData.video_url || null,
         duration: formData.duration || null,
         pathway_id: formData.pathway_id || null,
         skill_level: formData.skill_level,
@@ -167,17 +166,44 @@ export function AdminVideos() {
         is_active: formData.is_active,
       };
 
+      const trimmedUrl = formData.video_url.trim();
+      let videoId: string;
+
       if (editingVideo) {
         const { error } = await supabase
           .from("videos")
           .update(videoData)
           .eq("id", editingVideo.id);
         if (error) throw error;
+        videoId = editingVideo.id;
         toast({ title: "Video updated successfully" });
       } else {
-        const { error } = await supabase.from("videos").insert([videoData]);
+        const { data: inserted, error } = await supabase
+          .from("videos")
+          .insert([videoData])
+          .select("id")
+          .single();
         if (error) throw error;
+        videoId = inserted.id;
         toast({ title: "Video created successfully" });
+      }
+
+      // Sync video_sources (separate, access-controlled table)
+      if (trimmedUrl) {
+        const { error: srcError } = await supabase
+          .from("video_sources")
+          .upsert(
+            { video_id: videoId, video_url: trimmedUrl },
+            { onConflict: "video_id" }
+          );
+        if (srcError) throw srcError;
+      } else {
+        // No URL provided — remove any existing source row
+        const { error: delError } = await supabase
+          .from("video_sources")
+          .delete()
+          .eq("video_id", videoId);
+        if (delError) throw delError;
       }
 
       setIsDialogOpen(false);
