@@ -39,7 +39,7 @@ interface VideoData {
   title: string;
   description: string | null;
   thumbnail_url: string | null;
-  video_url: string | null;
+  video_url: string | null; // populated from video_sources, not videos
   duration: string | null;
   pathway_id: string | null;
   skill_level?: string;
