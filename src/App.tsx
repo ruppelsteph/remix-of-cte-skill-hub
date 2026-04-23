@@ -12,6 +12,8 @@ import Pricing from "./pages/Pricing";
 import Schools from "./pages/Schools";
 import About from "./pages/About";
 import Auth from "./pages/Auth";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 import Account from "./pages/Account";
 import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
@@ -34,6 +36,8 @@ const App = () => (
             <Route path="/schools" element={<Schools />} />
             <Route path="/about" element={<About />} />
             <Route path="/auth" element={<Auth />} />
+            <Route path="/auth/forgot" element={<ForgotPassword />} />
+            <Route path="/auth/reset" element={<ResetPassword />} />
             <Route path="/account" element={<Account />} />
             <Route path="/admin" element={<Admin />} />
             <Route path="*" element={<NotFound />} />
