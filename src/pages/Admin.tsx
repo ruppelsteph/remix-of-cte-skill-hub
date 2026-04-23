@@ -3,16 +3,18 @@ import { useNavigate } from "react-router-dom";
 import { Layout } from "@/components/layout/Layout";
 import { useAuth } from "@/contexts/AuthContext";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, Users, Video, FolderOpen, CreditCard } from "lucide-react";
+import { Loader2, Users, Video, FolderOpen, CreditCard, UserCog, Repeat } from "lucide-react";
 import { AdminCustomers } from "@/components/admin/AdminCustomers";
 import { AdminVideos } from "@/components/admin/AdminVideos";
 import { AdminPathways } from "@/components/admin/AdminPathways";
 import { AdminOrders } from "@/components/admin/AdminOrders";
+import { AdminUsers } from "@/components/admin/AdminUsers";
+import { AdminSubscriptions } from "@/components/admin/AdminSubscriptions";
 
 const Admin = () => {
   const { user, isLoading, isAdmin } = useAuth();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState("customers");
+  const [activeTab, setActiveTab] = useState("users");
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -48,7 +50,15 @@ const Admin = () => {
           </div>
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:inline-flex mb-6">
+            <TabsList className="grid w-full grid-cols-3 lg:grid-cols-6 lg:w-auto lg:inline-flex mb-6">
+              <TabsTrigger value="users" className="flex items-center gap-2">
+                <UserCog className="h-4 w-4" />
+                <span className="hidden sm:inline">Users</span>
+              </TabsTrigger>
+              <TabsTrigger value="subscriptions" className="flex items-center gap-2">
+                <Repeat className="h-4 w-4" />
+                <span className="hidden sm:inline">Subscriptions</span>
+              </TabsTrigger>
               <TabsTrigger value="customers" className="flex items-center gap-2">
                 <Users className="h-4 w-4" />
                 <span className="hidden sm:inline">Customers</span>
@@ -66,6 +76,14 @@ const Admin = () => {
                 <span className="hidden sm:inline">Pathways</span>
               </TabsTrigger>
             </TabsList>
+
+            <TabsContent value="users">
+              <AdminUsers />
+            </TabsContent>
+
+            <TabsContent value="subscriptions">
+              <AdminSubscriptions />
+            </TabsContent>
 
             <TabsContent value="customers">
               <AdminCustomers />

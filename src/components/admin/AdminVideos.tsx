@@ -32,7 +32,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, Plus, Pencil, Trash2, Video, Filter, X } from "lucide-react";
+import { Loader2, Plus, Pencil, Trash2, Video, Filter, X, FileText } from "lucide-react";
 
 interface VideoData {
   id: string;
@@ -62,6 +62,9 @@ export function AdminVideos() {
   const [editingVideo, setEditingVideo] = useState<VideoData | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [filterPathway, setFilterPathway] = useState<string>("all");
+  const [quickEditVideo, setQuickEditVideo] = useState<VideoData | null>(null);
+  const [quickDescription, setQuickDescription] = useState("");
+  const [isQuickSaving, setIsQuickSaving] = useState(false);
   const { toast } = useToast();
 
   const [formData, setFormData] = useState({
@@ -196,6 +199,35 @@ export function AdminVideos() {
         title: "Error",
         description: "Failed to delete video.",
       });
+    }
+  };
+
+  const openQuickEdit = (video: VideoData) => {
+    setQuickEditVideo(video);
+    setQuickDescription(video.description || "");
+  };
+
+  const saveQuickDescription = async () => {
+    if (!quickEditVideo) return;
+    setIsQuickSaving(true);
+    try {
+      const { error } = await supabase
+        .from("videos")
+        .update({ description: quickDescription || null })
+        .eq("id", quickEditVideo.id);
+      if (error) throw error;
+      toast({ title: "Description updated" });
+      setQuickEditVideo(null);
+      fetchData();
+    } catch (err) {
+      console.error("Error updating description:", err);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to update description.",
+      });
+    } finally {
+      setIsQuickSaving(false);
     }
   };
 
@@ -421,7 +453,16 @@ export function AdminVideos() {
                       <Button
                         variant="ghost"
                         size="sm"
+                        onClick={() => openQuickEdit(video)}
+                        title="Quick edit description"
+                      >
+                        <FileText className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
                         onClick={() => handleEdit(video)}
+                        title="Edit video"
                       >
                         <Pencil className="h-4 w-4" />
                       </Button>
@@ -430,6 +471,7 @@ export function AdminVideos() {
                         size="sm"
                         onClick={() => handleDelete(video.id)}
                         className="text-destructive hover:text-destructive"
+                        title="Delete video"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -440,6 +482,39 @@ export function AdminVideos() {
             </Table>
           </div>
         )}
+
+        {/* Quick description edit dialog */}
+        <Dialog
+          open={!!quickEditVideo}
+          onOpenChange={(open) => !open && setQuickEditVideo(null)}
+        >
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Edit description</DialogTitle>
+              <DialogDescription>
+                {quickEditVideo?.title}
+              </DialogDescription>
+            </DialogHeader>
+            <Textarea
+              value={quickDescription}
+              onChange={(e) => setQuickDescription(e.target.value)}
+              rows={6}
+              placeholder="Video description..."
+            />
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setQuickEditVideo(null)}
+              >
+                Cancel
+              </Button>
+              <Button onClick={saveQuickDescription} disabled={isQuickSaving}>
+                {isQuickSaving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                Save
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </CardContent>
     </Card>
   );
