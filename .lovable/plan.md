@@ -1,51 +1,44 @@
 
 
-## Plan: Extend the existing Admin Portal
+## Plan: Make password reset actually work
 
-Good news — most of what you described already exists at `/admin`. I'll outline what's there, what's missing, and what I'd add.
+### Problem
+1. Supabase Site URL is `http://localhost:3000` → recovery emails point to localhost. (Fix in Supabase dashboard, not code.)
+2. The app has no page that consumes the recovery token, so even with the right redirect, users can't set a new password.
+3. The admin "Reset password" button in `AdminUsers.tsx` and any future user-facing "Forgot password?" link both need to send users to a real reset page on the deployed app.
 
-### What already works today
-- **Admin route** at `/admin`, gated by the `admin` role in `public.user_roles`.
-- **Videos tab**: list, **add**, **edit (including descriptions)**, delete, filter by pathway, toggle active/free.
-- **Orders tab**: full Stripe order history with amount, status, refunds.
-- **Customers tab**: Stripe customers with their subscription status and per-customer charges/refund/cancel actions.
-- **Pathways tab**: full CRUD for pathways.
+### Code changes
 
-### What's missing vs. your request
-1. **"All users"** — the current Customers tab only shows people who have a Stripe customer record. Users who signed up but never paid are invisible.
-2. **"All subscriptions"** — subscriptions are buried inside the customer detail dialog. There's no top-level list of every subscription across the platform.
+**1. New page: `src/pages/ResetPassword.tsx` (route `/auth/reset`)**
+- On mount, listen for the `PASSWORD_RECOVERY` event from `supabase.auth.onAuthStateChange`. When Supabase processes the recovery token in the URL, it fires this event and establishes a temporary recovery session.
+- Show a simple form: new password + confirm password, with the same min-length rules as signup.
+- On submit, call `supabase.auth.updateUser({ password })`.
+- On success: toast, sign the user out, redirect to `/auth` so they can sign in with the new password.
+- Handle the error case where the link is expired or invalid (show a clear message + a "Request a new reset link" button that goes to a forgot-password flow).
 
-### What I'll add
+**2. New page: `src/pages/ForgotPassword.tsx` (route `/auth/forgot`)**
+- Email input → calls `supabase.auth.resetPasswordForEmail(email, { redirectTo: \`${window.location.origin}/auth/reset\` })`.
+- Always shows a generic "If that email exists, we've sent a reset link" message (don't reveal whether the email is registered — that's an account-enumeration leak).
 
-**1. New "Users" tab** (replaces or sits alongside Customers)
-- Lists every row in `public.profiles` joined with `user_roles` and `subscriptions`.
-- Columns: Email, Full Name, Role (`user`/`admin`), Subscription status, Signed up.
-- Search by email/name.
-- Action: promote/demote admin role (insert/delete in `user_roles`).
-- Read straight from the DB via the existing RLS policy `Admins can view all profiles` — no edge function needed.
+**3. `src/pages/Auth.tsx` — add "Forgot password?" link**
+- Small text link under the password field on the sign-in form, pointing to `/auth/forgot`.
 
-**2. New "Subscriptions" tab**
-- Top-level list of every row in `public.subscriptions`, joined with `profiles` for the user email.
-- Columns: User email, Product, Status, Current period end, Cancel-at-period-end flag, Created.
-- Filter by status (active / canceled / past_due / all).
-- Row action "Cancel" reuses the existing `admin-cancel-subscription` edge function.
-- Read via existing `Admins can view all subscriptions` RLS policy.
+**4. `src/components/admin/AdminUsers.tsx` — fix the admin reset button's redirect**
+- Currently uses `\`${window.location.origin}/auth\``. Change to `\`${window.location.origin}/auth/reset\`` so the recovery link lands on the new reset page instead of the sign-in page (which currently ignores the token).
 
-**3. Videos tab — minor polish for "edit descriptions"**
-- The edit dialog already supports description editing, but I'll add an **inline "Quick edit description"** affordance (pencil icon next to the title in the table that opens a small dialog with just the description field), so admins don't have to open the full edit form for that common task.
+**5. `src/App.tsx` — register the two new routes**
+- `/auth/reset` → `ResetPassword`
+- `/auth/forgot` → `ForgotPassword`
 
-### Tab layout after changes
-`Users · Subscriptions · Orders · Videos · Pathways` (5 tabs; the existing 4-column grid becomes 5).
+### What you (the user) must do — outside of code
+After I ship the code, you need to update Supabase Auth → URL Configuration:
+- **Site URL** → your live preview / published URL (not localhost).
+- **Redirect URLs** allow-list → add `<your-app-origin>/auth/reset` for every environment you use (preview, published, custom domain, optionally localhost:8080).
 
-### Technical notes
-- **No schema changes required.** All target tables (`profiles`, `user_roles`, `subscriptions`) already exist with admin-friendly RLS.
-- **No new edge functions required.** Role promotion uses direct `user_roles` insert/delete (RLS already allows admins). Subscription cancel reuses `admin-cancel-subscription`.
-- **Files to add**: `src/components/admin/AdminUsers.tsx`, `src/components/admin/AdminSubscriptions.tsx`.
-- **Files to edit**: `src/pages/Admin.tsx` (add two tabs, swap grid to 5 cols), `src/components/admin/AdminVideos.tsx` (add quick-description-edit dialog).
-- **Data freshness**: subscription rows in `public.subscriptions` are kept in sync by the existing `sync-subscription` / `check-subscription` edge functions.
+I'll include a button below the implementation to jump straight to that settings page.
 
 ### Out of scope (ask if you want them)
-- Bulk video CSV import.
-- Per-user video access grants UI (table `video_access` exists but has no admin UI yet).
-- Pulling auth-only users (people who exist in `auth.users` but somehow missing a `profiles` row) — the `handle_new_user` trigger should make this a non-issue.
+- Enabling Supabase's "leaked password protection" (also flagged in your security panel) — I can turn that on in the same pass.
+- Customizing the recovery email template with your branding (separate workflow).
+- Rate-limiting the forgot-password endpoint at the app level — Supabase already throttles this server-side.
 
