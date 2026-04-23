@@ -82,15 +82,26 @@ export function AdminVideos() {
   const fetchData = async () => {
     setIsLoading(true);
     try {
-      const [videosRes, pathwaysRes] = await Promise.all([
+      const [videosRes, pathwaysRes, sourcesRes] = await Promise.all([
         supabase.from("videos").select("*").order("created_at", { ascending: false }),
         supabase.from("pathways").select("id, title"),
+        supabase.from("video_sources").select("video_id, video_url"),
       ]);
 
       if (videosRes.error) throw videosRes.error;
       if (pathwaysRes.error) throw pathwaysRes.error;
+      if (sourcesRes.error) throw sourcesRes.error;
 
-      setVideos(videosRes.data || []);
+      const urlByVideo = new Map<string, string>(
+        (sourcesRes.data || []).map((s) => [s.video_id, s.video_url])
+      );
+
+      const merged: VideoData[] = (videosRes.data || []).map((v) => ({
+        ...v,
+        video_url: urlByVideo.get(v.id) ?? null,
+      }));
+
+      setVideos(merged);
       setPathways(pathwaysRes.data || []);
     } catch (err) {
       console.error("Error fetching data:", err);
