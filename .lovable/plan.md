@@ -1,31 +1,51 @@
 
 
-## Diagnosis: Preview shows nothing, but the app code is fine
+## Plan: Extend the existing Admin Portal
 
-### What I checked
-- **Dev server log** (`/tmp/dev-server-logs/dev-server.log`): Vite started cleanly on port 8080, no errors, no failed HMR updates.
-- **Runtime errors**: none
-- **Browser console logs**: completely empty
-- **Browser network requests**: completely empty
-- **Entry files** (`index.html`, `src/main.tsx`, `src/App.tsx`, `src/pages/Index.tsx`, `AuthContext.tsx`): no syntax errors, no broken imports, no infinite loops, no throwing providers.
+Good news — most of what you described already exists at `/admin`. I'll outline what's there, what's missing, and what I'd add.
 
-### Conclusion
-The app itself is healthy. The empty console + empty network logs (not even a document request) indicate the **preview iframe in the editor isn't connecting to the dev server** — this is an editor/iframe issue, not a code bug. Recent edits to `tsconfig.json` / `tsconfig.app.json` and `bun.lock` from a previous turn may have triggered a stale preview state.
+### What already works today
+- **Admin route** at `/admin`, gated by the `admin` role in `public.user_roles`.
+- **Videos tab**: list, **add**, **edit (including descriptions)**, delete, filter by pathway, toggle active/free.
+- **Orders tab**: full Stripe order history with amount, status, refunds.
+- **Customers tab**: Stripe customers with their subscription status and per-customer charges/refund/cancel actions.
+- **Pathways tab**: full CRUD for pathways.
 
-### Recommended user actions (try in order)
-1. **Hard refresh the preview**: Click the refresh icon on the preview pane (or Cmd/Ctrl+Shift+R inside it).
-2. **Hard reload the entire Lovable editor tab** in your browser.
-3. **Open the preview URL directly** in a new tab: `https://id-preview--68449dcf-81ef-4296-8787-95d2ded2c8cb.lovable.app` — if it loads there, the issue is purely the embedded iframe.
-4. **Check for browser extensions** (ad blockers, privacy tools) that may block the preview iframe.
+### What's missing vs. your request
+1. **"All users"** — the current Customers tab only shows people who have a Stripe customer record. Users who signed up but never paid are invisible.
+2. **"All subscriptions"** — subscriptions are buried inside the customer detail dialog. There's no top-level list of every subscription across the platform.
 
-### If the preview still doesn't load after those steps
-With your approval I can switch to default mode and:
-- **Restart the dev server** (`code--exec` to kill/restart the Vite process) to clear any stuck state.
-- **Inspect `tsconfig` changes** from the previous turn — those edits added `allowJs`, removed `strict`, and changed module-resolution settings; while not currently producing errors, I can revert them to a known-good baseline if anything looks off.
-- **Verify by navigating the browser tool to the preview URL** to confirm the page renders server-side and capture any iframe-specific errors.
+### What I'll add
+
+**1. New "Users" tab** (replaces or sits alongside Customers)
+- Lists every row in `public.profiles` joined with `user_roles` and `subscriptions`.
+- Columns: Email, Full Name, Role (`user`/`admin`), Subscription status, Signed up.
+- Search by email/name.
+- Action: promote/demote admin role (insert/delete in `user_roles`).
+- Read straight from the DB via the existing RLS policy `Admins can view all profiles` — no edge function needed.
+
+**2. New "Subscriptions" tab**
+- Top-level list of every row in `public.subscriptions`, joined with `profiles` for the user email.
+- Columns: User email, Product, Status, Current period end, Cancel-at-period-end flag, Created.
+- Filter by status (active / canceled / past_due / all).
+- Row action "Cancel" reuses the existing `admin-cancel-subscription` edge function.
+- Read via existing `Admins can view all subscriptions` RLS policy.
+
+**3. Videos tab — minor polish for "edit descriptions"**
+- The edit dialog already supports description editing, but I'll add an **inline "Quick edit description"** affordance (pencil icon next to the title in the table that opens a small dialog with just the description field), so admins don't have to open the full edit form for that common task.
+
+### Tab layout after changes
+`Users · Subscriptions · Orders · Videos · Pathways` (5 tabs; the existing 4-column grid becomes 5).
 
 ### Technical notes
-- No code change is required at this point — the app builds and serves correctly.
-- The `bun.lock` / tsconfig edits from the previous turn are unrelated to rendering.
-- If after restart the preview is still blank, the next likely culprit is a Cloud-side outage on the preview hosting layer, which Lovable support can investigate.
+- **No schema changes required.** All target tables (`profiles`, `user_roles`, `subscriptions`) already exist with admin-friendly RLS.
+- **No new edge functions required.** Role promotion uses direct `user_roles` insert/delete (RLS already allows admins). Subscription cancel reuses `admin-cancel-subscription`.
+- **Files to add**: `src/components/admin/AdminUsers.tsx`, `src/components/admin/AdminSubscriptions.tsx`.
+- **Files to edit**: `src/pages/Admin.tsx` (add two tabs, swap grid to 5 cols), `src/components/admin/AdminVideos.tsx` (add quick-description-edit dialog).
+- **Data freshness**: subscription rows in `public.subscriptions` are kept in sync by the existing `sync-subscription` / `check-subscription` edge functions.
+
+### Out of scope (ask if you want them)
+- Bulk video CSV import.
+- Per-user video access grants UI (table `video_access` exists but has no admin UI yet).
+- Pulling auth-only users (people who exist in `auth.users` but somehow missing a `profiles` row) — the `handle_new_user` trigger should make this a non-issue.
 
