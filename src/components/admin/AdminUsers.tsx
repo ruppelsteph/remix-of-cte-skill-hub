@@ -13,7 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Loader2, Users, Search, ShieldCheck, ShieldOff } from "lucide-react";
+import { Loader2, Users, Search, ShieldCheck, ShieldOff, KeyRound } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
 interface ProfileRow {
@@ -44,7 +44,31 @@ export function AdminUsers() {
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [resettingId, setResettingId] = useState<string | null>(null);
   const { toast } = useToast();
+
+  const sendPasswordReset = async (email: string, userId: string) => {
+    setResettingId(userId);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/auth`,
+      });
+      if (error) throw error;
+      toast({
+        title: "Reset email sent",
+        description: `A password reset link was emailed to ${email}.`,
+      });
+    } catch (err) {
+      console.error("Error sending password reset:", err);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to send password reset email.",
+      });
+    } finally {
+      setResettingId(null);
+    }
+  };
 
   const fetchData = async () => {
     setIsLoading(true);
@@ -205,26 +229,44 @@ export function AdminUsers() {
                         {new Date(p.created_at).toLocaleDateString()}
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => togglePromotion(p.user_id)}
-                          disabled={updatingId === p.user_id}
-                        >
-                          {updatingId === p.user_id ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : admin ? (
-                            <>
-                              <ShieldOff className="h-4 w-4 mr-1" />
-                              Demote
-                            </>
-                          ) : (
-                            <>
-                              <ShieldCheck className="h-4 w-4 mr-1" />
-                              Make admin
-                            </>
-                          )}
-                        </Button>
+                        <div className="flex justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => sendPasswordReset(p.email, p.user_id)}
+                            disabled={resettingId === p.user_id}
+                            title="Send password reset email"
+                          >
+                            {resettingId === p.user_id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <>
+                                <KeyRound className="h-4 w-4 mr-1" />
+                                Reset password
+                              </>
+                            )}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => togglePromotion(p.user_id)}
+                            disabled={updatingId === p.user_id}
+                          >
+                            {updatingId === p.user_id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : admin ? (
+                              <>
+                                <ShieldOff className="h-4 w-4 mr-1" />
+                                Demote
+                              </>
+                            ) : (
+                              <>
+                                <ShieldCheck className="h-4 w-4 mr-1" />
+                                Make admin
+                              </>
+                            )}
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   );
