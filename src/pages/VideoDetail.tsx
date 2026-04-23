@@ -126,17 +126,17 @@ export default function VideoDetail() {
               <div className="relative aspect-video rounded-xl overflow-hidden bg-secondary shadow-lg">
                 {canWatch ? (
                   // User can watch - show player
-                  video.video_url ? (
-                    video.video_url.includes("youtube.com") || video.video_url.includes("youtu.be") ? (
+                  videoUrl ? (
+                    videoUrl.includes("youtube.com") || videoUrl.includes("youtu.be") ? (
                       <iframe
-                        src={video.video_url.replace("watch?v=", "embed/").replace("youtu.be/", "youtube.com/embed/")}
+                        src={videoUrl.replace("watch?v=", "embed/").replace("youtu.be/", "youtube.com/embed/")}
                         className="h-full w-full"
                         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                         allowFullScreen
                       />
                     ) : (
                       <video
-                        src={video.video_url}
+                        src={videoUrl}
                         controls
                         className="h-full w-full"
                         poster={video.thumbnail_url || undefined}
