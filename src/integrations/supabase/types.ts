@@ -46,6 +46,38 @@ export type Database = {
           },
         ]
       }
+      group_purchases: {
+        Row: {
+          created_at: string
+          group_id: string
+          id: string
+          product_id: string | null
+          stripe_session_id: string
+        }
+        Insert: {
+          created_at?: string
+          group_id: string
+          id?: string
+          product_id?: string | null
+          stripe_session_id: string
+        }
+        Update: {
+          created_at?: string
+          group_id?: string
+          id?: string
+          product_id?: string | null
+          stripe_session_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_purchases_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       groups: {
         Row: {
           created_at: string
