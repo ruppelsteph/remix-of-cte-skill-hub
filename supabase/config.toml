@@ -23,3 +23,6 @@ verify_jwt = false
 
 [functions.register-with-coupon]
 verify_jwt = false
+
+[functions.group-admin-students]
+verify_jwt = false
