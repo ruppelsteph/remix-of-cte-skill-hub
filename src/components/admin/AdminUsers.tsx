@@ -13,8 +13,17 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Loader2, Users, Search, ShieldCheck, ShieldOff, KeyRound } from "lucide-react";
+import { Loader2, Users, Search, KeyRound } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+type AppRole = "admin" | "user" | "group_admin";
 
 interface ProfileRow {
   id: string;
@@ -27,7 +36,7 @@ interface ProfileRow {
 
 interface RoleRow {
   user_id: string;
-  role: "admin" | "user";
+  role: AppRole;
 }
 
 interface SubscriptionRow {
