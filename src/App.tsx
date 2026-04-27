@@ -16,6 +16,7 @@ import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import Account from "./pages/Account";
 import Admin from "./pages/Admin";
+import GroupAdmin from "./pages/GroupAdmin";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -40,6 +41,7 @@ const App = () => (
             <Route path="/auth/reset" element={<ResetPassword />} />
             <Route path="/account" element={<Account />} />
             <Route path="/admin" element={<Admin />} />
+            <Route path="/group-admin" element={<GroupAdmin />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

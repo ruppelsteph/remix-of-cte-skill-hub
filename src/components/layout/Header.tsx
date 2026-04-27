@@ -1,6 +1,6 @@
 import { Link, useLocation } from "react-router-dom";
 import { useState } from "react";
-import { Menu, X, User, LogOut, ChevronDown, Shield } from "lucide-react";
+import { Menu, X, User, LogOut, ChevronDown, Shield, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -23,7 +23,7 @@ const navLinks = [
 
 export function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const { user, signOut, isAdmin } = useAuth();
+  const { user, signOut, isAdmin, isGroupAdmin } = useAuth();
   const location = useLocation();
 
   return (
@@ -85,6 +85,14 @@ export function Header() {
                       My Account
                     </Link>
                   </DropdownMenuItem>
+                  {isGroupAdmin && (
+                    <DropdownMenuItem asChild>
+                      <Link to="/group-admin" className="cursor-pointer">
+                        <Users className="mr-2 h-4 w-4" />
+                        Group Dashboard
+                      </Link>
+                    </DropdownMenuItem>
+                  )}
                   {isAdmin && (
                     <DropdownMenuItem asChild>
                       <Link to="/admin" className="cursor-pointer">
@@ -152,6 +160,16 @@ export function Header() {
                       <User className="h-4 w-4" />
                       My Account
                     </Link>
+                    {isGroupAdmin && (
+                      <Link
+                        to="/group-admin"
+                        onClick={() => setMobileMenuOpen(false)}
+                        className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground"
+                      >
+                        <Users className="h-4 w-4" />
+                        Group Dashboard
+                      </Link>
+                    )}
                     {isAdmin && (
                       <Link
                         to="/admin"
