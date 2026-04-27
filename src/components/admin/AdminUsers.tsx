@@ -212,15 +212,15 @@ export function AdminUsers() {
               </TableHeader>
               <TableBody>
                 {filtered.map((p) => {
-                  const admin = isAdmin(p.user_id);
+                  const role = getRole(p.user_id);
                   const sub = getSubscription(p.user_id);
                   return (
                     <TableRow key={p.id}>
                       <TableCell className="font-medium">{p.email}</TableCell>
                       <TableCell>{p.full_name || "—"}</TableCell>
                       <TableCell>
-                        <Badge variant={admin ? "default" : "secondary"}>
-                          {admin ? "admin" : "user"}
+                        <Badge variant={role === "admin" ? "default" : "secondary"}>
+                          {role}
                         </Badge>
                       </TableCell>
                       <TableCell>
@@ -246,7 +246,7 @@ export function AdminUsers() {
                         {new Date(p.created_at).toLocaleDateString()}
                       </TableCell>
                       <TableCell className="text-right">
-                        <div className="flex justify-end gap-1">
+                        <div className="flex justify-end gap-2">
                           <Button
                             variant="ghost"
                             size="sm"
@@ -263,26 +263,24 @@ export function AdminUsers() {
                               </>
                             )}
                           </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => togglePromotion(p.user_id)}
+                          <Select
+                            value={role}
+                            onValueChange={(v) => changeRole(p.user_id, v as AppRole)}
                             disabled={updatingId === p.user_id}
                           >
-                            {updatingId === p.user_id ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : admin ? (
-                              <>
-                                <ShieldOff className="h-4 w-4 mr-1" />
-                                Demote
-                              </>
-                            ) : (
-                              <>
-                                <ShieldCheck className="h-4 w-4 mr-1" />
-                                Make admin
-                              </>
-                            )}
-                          </Button>
+                            <SelectTrigger className="w-[140px] h-9">
+                              {updatingId === p.user_id ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <SelectValue />
+                              )}
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="user">user</SelectItem>
+                              <SelectItem value="group_admin">group_admin</SelectItem>
+                              <SelectItem value="admin">admin</SelectItem>
+                            </SelectContent>
+                          </Select>
                         </div>
                       </TableCell>
                     </TableRow>
