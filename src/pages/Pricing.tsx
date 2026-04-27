@@ -101,8 +101,9 @@ const Pricing = () => {
     setSubmittingGroup(true);
     try {
       const priceId = PRICE_IDS[groupPlan];
+      const seats = Math.max(1, Math.min(1000, parseInt(seatCount, 10) || 25));
       const { data, error } = await supabase.functions.invoke("create-group-checkout", {
-        body: { priceId, groupName: trimmed },
+        body: { priceId, groupName: trimmed, seatCount: seats },
       });
       if (error) throw error;
       if (data?.url) {
