@@ -211,6 +211,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signOut,
         isSubscribed: user?.isSubscribed ?? false,
         isAdmin: user?.isAdmin ?? false,
+        isGroupAdmin: user?.isGroupAdmin ?? false,
+        groupId: user?.groupId ?? null,
         refreshSubscription,
       }}
     >
