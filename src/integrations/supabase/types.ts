@@ -14,6 +14,38 @@ export type Database = {
   }
   public: {
     Tables: {
+      categories: {
+        Row: {
+          created_at: string
+          id: number
+          name: string
+          parent_id: number | null
+          slug: string
+        }
+        Insert: {
+          created_at?: string
+          id?: number
+          name: string
+          parent_id?: number | null
+          slug: string
+        }
+        Update: {
+          created_at?: string
+          id?: number
+          name?: string
+          parent_id?: number | null
+          slug?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "categories_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       group_coupon_codes: {
         Row: {
           code: string
@@ -316,6 +348,44 @@ export type Database = {
           },
         ]
       }
+      subscription_entitlements: {
+        Row: {
+          access_type: string
+          audience: string
+          billing_interval: string
+          category_id: number | null
+          created_at: string
+          id: string
+          stripe_price_id: string
+        }
+        Insert: {
+          access_type: string
+          audience: string
+          billing_interval: string
+          category_id?: number | null
+          created_at?: string
+          id?: string
+          stripe_price_id: string
+        }
+        Update: {
+          access_type?: string
+          audience?: string
+          billing_interval?: string
+          category_id?: number | null
+          created_at?: string
+          id?: string
+          stripe_price_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscription_entitlements_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       subscriptions: {
         Row: {
           cancel_at_period_end: boolean | null
@@ -489,6 +559,7 @@ export type Database = {
       videos: {
         Row: {
           category_id: string | null
+          category_id_new: number | null
           created_at: string
           description: string | null
           duration: string | null
@@ -504,6 +575,7 @@ export type Database = {
         }
         Insert: {
           category_id?: string | null
+          category_id_new?: number | null
           created_at?: string
           description?: string | null
           duration?: string | null
@@ -519,6 +591,7 @@ export type Database = {
         }
         Update: {
           category_id?: string | null
+          category_id_new?: number | null
           created_at?: string
           description?: string | null
           duration?: string | null
@@ -541,6 +614,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "videos_category_id_new_fkey"
+            columns: ["category_id_new"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "videos_pathway_id_fkey"
             columns: ["pathway_id"]
             isOneToOne: false
@@ -554,6 +634,18 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      category_ancestors: {
+        Args: { _leaf: number }
+        Returns: {
+          id: number
+        }[]
+      }
+      category_descendants: {
+        Args: { _root: number }
+        Returns: {
+          id: number
+        }[]
+      }
       current_user_group_ids: { Args: never; Returns: string[] }
       has_role: {
         Args: {
@@ -569,6 +661,10 @@ export type Database = {
       }
       user_has_group_purchase_access: {
         Args: { _user_id: string }
+        Returns: boolean
+      }
+      user_has_video_access: {
+        Args: { _user: string; _video: string }
         Returns: boolean
       }
     }
