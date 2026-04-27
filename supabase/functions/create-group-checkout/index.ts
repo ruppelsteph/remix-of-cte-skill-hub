@@ -145,12 +145,14 @@ serve(async (req) => {
         group_id: groupId!,
         product_id: productId,
         purchase_type: "group",
+        seat_count: String(seatCount),
       },
       subscription_data: {
         metadata: {
           group_id: groupId!,
           product_id: productId,
           purchase_type: "group",
+          seat_count: String(seatCount),
         },
       },
     });
