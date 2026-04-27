@@ -67,30 +67,46 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const checkAdminRole = async (userId: string) => {
+  const checkRoles = async (userId: string): Promise<{ isAdmin: boolean; isGroupAdmin: boolean }> => {
     try {
       const { data, error } = await supabase
         .from('user_roles')
         .select('role')
-        .eq('user_id', userId)
-        .eq('role', 'admin')
-        .maybeSingle();
+        .eq('user_id', userId);
 
       if (error) {
-        console.error('Error checking admin role:', error);
-        return false;
+        console.error('Error checking roles:', error);
+        return { isAdmin: false, isGroupAdmin: false };
       }
-      return !!data;
+      const roles = (data || []).map((r) => r.role);
+      return {
+        isAdmin: roles.includes('admin'),
+        isGroupAdmin: roles.includes('group_admin'),
+      };
     } catch (err) {
-      console.error('Error checking admin role:', err);
-      return false;
+      console.error('Error checking roles:', err);
+      return { isAdmin: false, isGroupAdmin: false };
+    }
+  };
+
+  const fetchGroupId = async (userId: string): Promise<string | null> => {
+    try {
+      const { data } = await supabase
+        .from('profiles')
+        .select('group_id')
+        .eq('user_id', userId)
+        .maybeSingle();
+      return (data?.group_id as string | null) ?? null;
+    } catch {
+      return null;
     }
   };
 
   const buildUser = async (supabaseUser: SupabaseUser): Promise<User> => {
-    const [subscriptionInfo, isAdmin] = await Promise.all([
+    const [subscriptionInfo, roleInfo, groupId] = await Promise.all([
       checkSubscription(supabaseUser),
-      checkAdminRole(supabaseUser.id),
+      checkRoles(supabaseUser.id),
+      fetchGroupId(supabaseUser.id),
     ]);
 
     return {
@@ -98,7 +114,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       email: supabaseUser.email || '',
       fullName: supabaseUser.user_metadata?.full_name || supabaseUser.user_metadata?.name || null,
       isSubscribed: subscriptionInfo.subscribed,
-      isAdmin,
+      isAdmin: roleInfo.isAdmin,
+      isGroupAdmin: roleInfo.isGroupAdmin,
+      groupId,
       subscriptionEnd: subscriptionInfo.subscriptionEnd,
       subscriptionEndUnix: subscriptionInfo.subscriptionEndUnix,
       subscriptionStatus: subscriptionInfo.subscriptionStatus,
