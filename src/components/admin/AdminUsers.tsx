@@ -13,8 +13,17 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Loader2, Users, Search, ShieldCheck, ShieldOff, KeyRound } from "lucide-react";
+import { Loader2, Users, Search, KeyRound } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+type AppRole = "admin" | "user" | "group_admin";
 
 interface ProfileRow {
   id: string;
@@ -27,7 +36,7 @@ interface ProfileRow {
 
 interface RoleRow {
   user_id: string;
-  role: "admin" | "user";
+  role: AppRole;
 }
 
 interface SubscriptionRow {
@@ -100,39 +109,47 @@ export function AdminUsers() {
     fetchData();
   }, []);
 
-  const isAdmin = (userId: string) =>
-    roles.some((r) => r.user_id === userId && r.role === "admin");
+  const getRole = (userId: string): AppRole => {
+    if (roles.some((r) => r.user_id === userId && r.role === "admin")) return "admin";
+    if (roles.some((r) => r.user_id === userId && r.role === "group_admin")) return "group_admin";
+    return "user";
+  };
 
   const getSubscription = (userId: string) =>
     subscriptions.find((s) => s.user_id === userId);
 
-  const togglePromotion = async (userId: string) => {
+  const changeRole = async (userId: string, newRole: AppRole) => {
+    const currentRole = getRole(userId);
+    if (currentRole === newRole) return;
+
+    if (currentUser?.id === userId && currentRole === "admin" && newRole !== "admin") {
+      toast({
+        variant: "destructive",
+        title: "Action blocked",
+        description: "You can't remove your own admin role.",
+      });
+      return;
+    }
+
     setUpdatingId(userId);
     try {
-      if (isAdmin(userId)) {
-        if (currentUser?.id === userId) {
-          toast({
-            variant: "destructive",
-            title: "Action blocked",
-            description: "You can't remove your own admin role.",
-          });
-          setUpdatingId(null);
-          return;
-        }
-        const { error } = await supabase
+      // Remove existing privileged roles for this user
+      const { error: delError } = await supabase
+        .from("user_roles")
+        .delete()
+        .eq("user_id", userId)
+        .in("role", ["admin", "group_admin"]);
+      if (delError) throw delError;
+
+      // Insert the new role unless it's plain 'user'
+      if (newRole !== "user") {
+        const { error: insError } = await supabase
           .from("user_roles")
-          .delete()
-          .eq("user_id", userId)
-          .eq("role", "admin");
-        if (error) throw error;
-        toast({ title: "Admin role removed" });
-      } else {
-        const { error } = await supabase
-          .from("user_roles")
-          .insert([{ user_id: userId, role: "admin" }]);
-        if (error) throw error;
-        toast({ title: "Admin role granted" });
+          .insert([{ user_id: userId, role: newRole }]);
+        if (insError) throw insError;
       }
+
+      toast({ title: `Role updated to ${newRole}` });
       await fetchData();
     } catch (err) {
       console.error("Error updating role:", err);
@@ -195,15 +212,15 @@ export function AdminUsers() {
               </TableHeader>
               <TableBody>
                 {filtered.map((p) => {
-                  const admin = isAdmin(p.user_id);
+                  const role = getRole(p.user_id);
                   const sub = getSubscription(p.user_id);
                   return (
                     <TableRow key={p.id}>
                       <TableCell className="font-medium">{p.email}</TableCell>
                       <TableCell>{p.full_name || "—"}</TableCell>
                       <TableCell>
-                        <Badge variant={admin ? "default" : "secondary"}>
-                          {admin ? "admin" : "user"}
+                        <Badge variant={role === "admin" ? "default" : "secondary"}>
+                          {role}
                         </Badge>
                       </TableCell>
                       <TableCell>
@@ -229,7 +246,7 @@ export function AdminUsers() {
                         {new Date(p.created_at).toLocaleDateString()}
                       </TableCell>
                       <TableCell className="text-right">
-                        <div className="flex justify-end gap-1">
+                        <div className="flex justify-end gap-2">
                           <Button
                             variant="ghost"
                             size="sm"
@@ -246,26 +263,24 @@ export function AdminUsers() {
                               </>
                             )}
                           </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => togglePromotion(p.user_id)}
+                          <Select
+                            value={role}
+                            onValueChange={(v) => changeRole(p.user_id, v as AppRole)}
                             disabled={updatingId === p.user_id}
                           >
-                            {updatingId === p.user_id ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : admin ? (
-                              <>
-                                <ShieldOff className="h-4 w-4 mr-1" />
-                                Demote
-                              </>
-                            ) : (
-                              <>
-                                <ShieldCheck className="h-4 w-4 mr-1" />
-                                Make admin
-                              </>
-                            )}
-                          </Button>
+                            <SelectTrigger className="w-[140px] h-9">
+                              {updatingId === p.user_id ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <SelectValue />
+                              )}
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="user">user</SelectItem>
+                              <SelectItem value="group_admin">group_admin</SelectItem>
+                              <SelectItem value="admin">admin</SelectItem>
+                            </SelectContent>
+                          </Select>
                         </div>
                       </TableCell>
                     </TableRow>

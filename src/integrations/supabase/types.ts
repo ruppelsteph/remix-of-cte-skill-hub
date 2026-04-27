@@ -14,6 +14,62 @@ export type Database = {
   }
   public: {
     Tables: {
+      group_members: {
+        Row: {
+          created_at: string
+          group_id: string
+          id: string
+          role: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          group_id: string
+          id?: string
+          role: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          group_id?: string
+          id?: string
+          role?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_members_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      groups: {
+        Row: {
+          created_at: string
+          created_by: string
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       orders: {
         Row: {
           amount: number
@@ -104,7 +160,9 @@ export type Database = {
           created_at: string
           email: string
           full_name: string | null
+          group_id: string | null
           id: string
+          role: string
           stripe_customer_id: string | null
           updated_at: string
           user_id: string
@@ -114,7 +172,9 @@ export type Database = {
           created_at?: string
           email: string
           full_name?: string | null
+          group_id?: string | null
           id?: string
+          role?: string
           stripe_customer_id?: string | null
           updated_at?: string
           user_id: string
@@ -124,12 +184,22 @@ export type Database = {
           created_at?: string
           email?: string
           full_name?: string | null
+          group_id?: string | null
           id?: string
+          role?: string
           stripe_customer_id?: string | null
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profiles_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       subscriptions: {
         Row: {
@@ -369,6 +439,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      current_user_group_ids: { Args: never; Returns: string[] }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -376,6 +447,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_group_admin_of: { Args: { _group_id: string }; Returns: boolean }
     }
     Enums: {
       app_role: "admin" | "user" | "group_admin"
