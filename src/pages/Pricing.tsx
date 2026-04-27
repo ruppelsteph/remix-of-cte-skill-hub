@@ -31,6 +31,10 @@ const PRICE_IDS = {
 
 const Pricing = () => {
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
+  const [groupDialogOpen, setGroupDialogOpen] = useState(false);
+  const [groupName, setGroupName] = useState("");
+  const [groupPlan, setGroupPlan] = useState<"monthly" | "annual">("annual");
+  const [submittingGroup, setSubmittingGroup] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -71,6 +75,50 @@ const Pricing = () => {
       });
     } finally {
       setLoadingPlan(null);
+    }
+  };
+
+  const openGroupDialog = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      navigate(`/auth?mode=signup&redirect=/pricing&plan=group`);
+      return;
+    }
+    setGroupDialogOpen(true);
+  };
+
+  const handleGroupCheckout = async () => {
+    const trimmed = groupName.trim();
+    if (!trimmed) {
+      toast({
+        variant: "destructive",
+        title: "Group name required",
+        description: "Please enter a name for your group.",
+      });
+      return;
+    }
+    setSubmittingGroup(true);
+    try {
+      const priceId = PRICE_IDS[groupPlan];
+      const { data, error } = await supabase.functions.invoke("create-group-checkout", {
+        body: { priceId, groupName: trimmed },
+      });
+      if (error) throw error;
+      if (data?.url) {
+        window.location.href = data.url;
+      } else {
+        throw new Error("No checkout URL returned");
+      }
+    } catch (error) {
+      console.error("Group checkout error:", error);
+      toast({
+        variant: "destructive",
+        title: "Checkout Error",
+        description:
+          error instanceof Error ? error.message : "Failed to start group checkout.",
+      });
+    } finally {
+      setSubmittingGroup(false);
     }
   };
 
