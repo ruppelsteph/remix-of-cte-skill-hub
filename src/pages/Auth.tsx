@@ -197,6 +197,27 @@ const Auth = () => {
                 />
               </div>
 
+              {mode === "signup" && (
+                <div>
+                  <Label htmlFor="couponCode">Coupon Code</Label>
+                  <Input
+                    id="couponCode"
+                    type="text"
+                    value={couponCode}
+                    onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                    placeholder="CLASS-XXXXXX"
+                    required={mode === "signup"}
+                    autoCapitalize="characters"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    className="mt-1 font-mono tracking-wide uppercase"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Enter the code provided by your group admin to enroll.
+                  </p>
+                </div>
+              )}
+
               <Button type="submit" className="w-full" disabled={isSubmitting}>
                 {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 {mode === "signin" ? "Sign In" : "Create Account"}
