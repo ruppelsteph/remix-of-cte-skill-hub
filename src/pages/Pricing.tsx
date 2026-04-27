@@ -34,6 +34,7 @@ const Pricing = () => {
   const [groupDialogOpen, setGroupDialogOpen] = useState(false);
   const [groupName, setGroupName] = useState("");
   const [groupPlan, setGroupPlan] = useState<"monthly" | "annual">("annual");
+  const [seatCount, setSeatCount] = useState<string>("25");
   const [submittingGroup, setSubmittingGroup] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
