@@ -61,6 +61,10 @@ serve(async (req) => {
 
     const groupId = session.metadata?.group_id;
     const productId = session.metadata?.product_id ?? null;
+    const seatCountRaw = Number(session.metadata?.seat_count);
+    const seatCount = Number.isFinite(seatCountRaw) && seatCountRaw > 0
+      ? Math.min(Math.floor(seatCountRaw), 1000)
+      : 25;
     if (!groupId) throw new Error("Session metadata missing group_id");
 
     // Verify caller is group_admin of this group (or site admin) — defense in depth
@@ -91,13 +95,65 @@ serve(async (req) => {
         product_id: productId,
       }]);
 
-    if (insertErr && insertErr.code !== "23505") {
+    const purchaseAlreadyExisted = insertErr?.code === "23505";
+    if (insertErr && !purchaseAlreadyExisted) {
       throw new Error(`Failed to record purchase: ${insertErr.message}`);
     }
-    logStep("Group purchase recorded", { groupId, sessionId });
+    logStep("Group purchase recorded", { groupId, sessionId, alreadyExisted: purchaseAlreadyExisted });
+
+    // Generate a coupon code tied to this purchase (one per session, idempotent).
+    // Format: CLASS-XXXXXX (6 chars, no ambiguous 0/O/1/I).
+    const ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    const generateCode = () => {
+      let s = "CLASS-";
+      const bytes = new Uint8Array(6);
+      crypto.getRandomValues(bytes);
+      for (const b of bytes) s += ALPHABET[b % ALPHABET.length];
+      return s;
+    };
+
+    let couponCode: string | null = null;
+    let couponId: string | null = null;
+
+    // Only auto-generate if no code yet exists for this purchase context.
+    // Heuristic: skip generation when the session was already recorded earlier.
+    if (!purchaseAlreadyExisted) {
+      for (let attempt = 0; attempt < 5; attempt++) {
+        const candidate = generateCode();
+        const { data: inserted, error: codeErr } = await supabaseAdmin
+          .from("group_coupon_codes")
+          .insert([{
+            group_id: groupId,
+            code: candidate,
+            max_redemptions: seatCount,
+            created_by: user.id,
+          }])
+          .select("id, code")
+          .single();
+
+        if (!codeErr && inserted) {
+          couponCode = inserted.code;
+          couponId = inserted.id;
+          logStep("Coupon code generated", { couponId, couponCode, seatCount });
+          break;
+        }
+        if (codeErr && codeErr.code !== "23505") {
+          // Non-collision error: log and stop trying.
+          logStep("Coupon insert error", { message: codeErr.message });
+          break;
+        }
+      }
+    }
 
     return new Response(
-      JSON.stringify({ recorded: true, groupId, productId }),
+      JSON.stringify({
+        recorded: true,
+        groupId,
+        productId,
+        couponCode,
+        couponId,
+        seatCount,
+      }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 },
     );
   } catch (error) {

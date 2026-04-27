@@ -34,6 +34,7 @@ const Pricing = () => {
   const [groupDialogOpen, setGroupDialogOpen] = useState(false);
   const [groupName, setGroupName] = useState("");
   const [groupPlan, setGroupPlan] = useState<"monthly" | "annual">("annual");
+  const [seatCount, setSeatCount] = useState<string>("25");
   const [submittingGroup, setSubmittingGroup] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -100,8 +101,9 @@ const Pricing = () => {
     setSubmittingGroup(true);
     try {
       const priceId = PRICE_IDS[groupPlan];
+      const seats = Math.max(1, Math.min(1000, parseInt(seatCount, 10) || 25));
       const { data, error } = await supabase.functions.invoke("create-group-checkout", {
-        body: { priceId, groupName: trimmed },
+        body: { priceId, groupName: trimmed, seatCount: seats },
       });
       if (error) throw error;
       if (data?.url) {
@@ -307,6 +309,20 @@ const Pricing = () => {
                   <SelectItem value="annual">Annual — $39.99/month (billed yearly)</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="seat-count">Number of seats</Label>
+              <Input
+                id="seat-count"
+                type="number"
+                min={1}
+                max={1000}
+                value={seatCount}
+                onChange={(e) => setSeatCount(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                We'll generate a coupon code with this many redemptions for your students.
+              </p>
             </div>
           </div>
           <DialogFooter>

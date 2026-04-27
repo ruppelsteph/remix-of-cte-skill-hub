@@ -52,15 +52,21 @@ const Account = () => {
         hasHandledSuccess.current = true;
         const sessionId = searchParams.get("session_id");
         try {
+          let couponCode: string | null = null;
+          let seatCount: number | null = null;
           if (sessionId) {
-            await supabase.functions.invoke("verify-group-purchase", {
+            const { data } = await supabase.functions.invoke("verify-group-purchase", {
               body: { sessionId },
             });
+            couponCode = data?.couponCode ?? null;
+            seatCount = data?.seatCount ?? null;
           }
           await supabase.functions.invoke("sync-subscription").catch(() => {});
           toast({
             title: "Group purchase successful!",
-            description: "Your group is set up and ready to go.",
+            description: couponCode
+              ? `Your coupon code is ${couponCode}${seatCount ? ` (${seatCount} seats)` : ""}.`
+              : "Your group is set up and ready to go.",
           });
           await refreshSubscription();
         } catch (err) {
