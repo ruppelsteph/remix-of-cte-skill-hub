@@ -246,8 +246,90 @@ const Pricing = () => {
               </Button>
             </div>
           </div>
+
+          {/* Buy for a Group */}
+          <div className="mt-12 max-w-3xl mx-auto bg-card rounded-2xl p-8 border border-border shadow-sm text-center">
+            <Users className="h-10 w-10 text-primary mx-auto mb-3" />
+            <h3 className="text-xl font-semibold text-card-foreground mb-2">
+              Buy for a Group
+            </h3>
+            <p className="text-muted-foreground text-sm mb-6 max-w-xl mx-auto">
+              Subscribing on behalf of a class, team, or cohort? Set up a group now and
+              add students later.
+            </p>
+            <Button onClick={openGroupDialog} disabled={submittingGroup}>
+              {submittingGroup ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                <>
+                  <Users className="mr-2 h-4 w-4" />
+                  Buy for a Group
+                </>
+              )}
+            </Button>
+          </div>
         </div>
       </section>
+
+      {/* Group purchase dialog */}
+      <Dialog open={groupDialogOpen} onOpenChange={setGroupDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Set up your group</DialogTitle>
+            <DialogDescription>
+              Give your group a name and pick a plan. You'll be set as the group admin.
+              You can invite students after checkout.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label htmlFor="group-name">Group name</Label>
+              <Input
+                id="group-name"
+                placeholder="e.g. Lincoln High - Period 3"
+                value={groupName}
+                onChange={(e) => setGroupName(e.target.value)}
+                maxLength={120}
+                autoFocus
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Plan</Label>
+              <Select value={groupPlan} onValueChange={(v) => setGroupPlan(v as "monthly" | "annual")}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="monthly">Monthly — $49.99/month</SelectItem>
+                  <SelectItem value="annual">Annual — $39.99/month (billed yearly)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setGroupDialogOpen(false)}
+              disabled={submittingGroup}
+            >
+              Cancel
+            </Button>
+            <Button onClick={handleGroupCheckout} disabled={submittingGroup}>
+              {submittingGroup ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                "Continue to checkout"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* FAQ Section */}
       <section className="py-16 lg:py-24 bg-muted/30">
