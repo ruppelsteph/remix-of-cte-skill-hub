@@ -43,6 +43,37 @@ const Account = () => {
         // Clear the success param from URL to prevent re-triggering
         setSearchParams({}, { replace: true });
       }
+
+      // Group purchase success
+      if (
+        searchParams.get("group_purchase") === "success" &&
+        !hasHandledSuccess.current
+      ) {
+        hasHandledSuccess.current = true;
+        const sessionId = searchParams.get("session_id");
+        try {
+          if (sessionId) {
+            await supabase.functions.invoke("verify-group-purchase", {
+              body: { sessionId },
+            });
+          }
+          await supabase.functions.invoke("sync-subscription").catch(() => {});
+          toast({
+            title: "Group purchase successful!",
+            description: "Your group is set up and ready to go.",
+          });
+          await refreshSubscription();
+        } catch (err) {
+          console.error("Error verifying group purchase:", err);
+          toast({
+            variant: "destructive",
+            title: "Verification issue",
+            description:
+              "Payment succeeded but we couldn't record the group purchase. Please contact support.",
+          });
+        }
+        setSearchParams({}, { replace: true });
+      }
     };
     syncAndRefresh();
   }, [searchParams, setSearchParams, refreshSubscription, toast]);
