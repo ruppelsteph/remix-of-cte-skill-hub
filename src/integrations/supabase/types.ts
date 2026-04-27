@@ -17,6 +17,7 @@ export type Database = {
       categories: {
         Row: {
           created_at: string
+          description: string | null
           id: number
           name: string
           parent_id: number | null
@@ -24,6 +25,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          description?: string | null
           id?: number
           name: string
           parent_id?: number | null
@@ -31,6 +33,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          description?: string | null
           id?: number
           name?: string
           parent_id?: number | null
