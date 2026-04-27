@@ -20,3 +20,6 @@ verify_jwt = false
 
 [functions.sync-subscription]
 verify_jwt = false
+
+[functions.register-with-coupon]
+verify_jwt = false
