@@ -563,6 +563,10 @@ export type Database = {
         Returns: boolean
       }
       is_group_admin_of: { Args: { _group_id: string }; Returns: boolean }
+      redeem_group_coupon: {
+        Args: { _code: string; _user_id: string }
+        Returns: Json
+      }
       user_has_group_purchase_access: {
         Args: { _user_id: string }
         Returns: boolean

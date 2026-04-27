@@ -17,9 +17,70 @@ const json = (status: number, body: Record<string, unknown>) =>
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 
+// ---- In-memory rate limiter (best-effort; resets when the isolate restarts) ----
+// Caps brute-force attempts at the coupon validation endpoint per client IP.
+type Bucket = { count: number; firstAt: number; blockUntil: number };
+const buckets = new Map<string, Bucket>();
+const WINDOW_MS = 60_000;          // 1 minute window
+const MAX_ATTEMPTS_PER_WINDOW = 10; // 10 attempts / IP / minute
+const BLOCK_MS = 10 * 60_000;       // 10 minute block when exceeded
+
+function getClientIp(req: Request): string {
+  const xff = req.headers.get("x-forwarded-for");
+  if (xff) return xff.split(",")[0].trim();
+  return req.headers.get("cf-connecting-ip") ||
+    req.headers.get("x-real-ip") ||
+    "unknown";
+}
+
+function checkRateLimit(ip: string): { ok: boolean; retryAfter?: number } {
+  const now = Date.now();
+  let b = buckets.get(ip);
+
+  // Periodically prune (cheap)
+  if (buckets.size > 5000) {
+    for (const [k, v] of buckets) {
+      if (now - v.firstAt > WINDOW_MS && now > v.blockUntil) buckets.delete(k);
+    }
+  }
+
+  if (b && now < b.blockUntil) {
+    return { ok: false, retryAfter: Math.ceil((b.blockUntil - now) / 1000) };
+  }
+  if (!b || now - b.firstAt > WINDOW_MS) {
+    b = { count: 1, firstAt: now, blockUntil: 0 };
+    buckets.set(ip, b);
+    return { ok: true };
+  }
+  b.count += 1;
+  if (b.count > MAX_ATTEMPTS_PER_WINDOW) {
+    b.blockUntil = now + BLOCK_MS;
+    return { ok: false, retryAfter: Math.ceil(BLOCK_MS / 1000) };
+  }
+  return { ok: true };
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
+  }
+
+  // Rate limit BEFORE doing any work
+  const ip = getClientIp(req);
+  const rl = checkRateLimit(ip);
+  if (!rl.ok) {
+    log("Rate limited", { ip, retryAfter: rl.retryAfter });
+    return new Response(
+      JSON.stringify({ error: "Too many attempts. Please try again later." }),
+      {
+        status: 429,
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "application/json",
+          "Retry-After": String(rl.retryAfter ?? 60),
+        },
+      },
+    );
   }
 
   const admin = createClient(
@@ -49,12 +110,11 @@ serve(async (req) => {
     if (!code) return json(400, { error: "Coupon code is required." });
     if (code.length > 64) return json(400, { error: "Coupon code is invalid." });
 
-    log("Validating coupon", { code });
-
-    // 1. Look up coupon
+    // ---- Cheap pre-check: does the code exist & look valid? ----
+    // (Final, authoritative check happens atomically inside redeem_group_coupon below.)
     const { data: coupon, error: couponErr } = await admin
       .from("group_coupon_codes")
-      .select("id, group_id, max_redemptions, redemption_count, expires_at, is_active")
+      .select("id, is_active, expires_at, max_redemptions, redemption_count")
       .eq("code", code)
       .maybeSingle();
 
@@ -71,28 +131,9 @@ serve(async (req) => {
       return json(400, { error: "This coupon code has reached its redemption limit." });
     }
 
-    // 2. Check if email already redeemed this code
-    const { data: existingUser } = await admin
-      .from("profiles")
-      .select("user_id")
-      .eq("email", email)
-      .maybeSingle();
+    log("Coupon pre-check passed, creating user");
 
-    if (existingUser?.user_id) {
-      const { data: prior } = await admin
-        .from("group_coupon_redemptions")
-        .select("id")
-        .eq("coupon_code_id", coupon.id)
-        .eq("user_id", existingUser.user_id)
-        .maybeSingle();
-      if (prior) {
-        return json(400, { error: "You have already redeemed this coupon code." });
-      }
-    }
-
-    log("Coupon valid, creating user");
-
-    // 3. Create user via admin API (email_confirm=false → verification email is sent)
+    // Create user via admin API (email_confirm=false → verification email is sent)
     const { data: created, error: createErr } = await admin.auth.admin.createUser({
       email,
       password,
@@ -118,41 +159,33 @@ serve(async (req) => {
     });
     if (linkErr) log("generateLink note", { error: linkErr.message });
 
-    // 4. Insert redemption first (unique constraint protects against double-claim)
-    const { error: redErr } = await admin.from("group_coupon_redemptions").insert({
-      coupon_code_id: coupon.id,
-      group_id: coupon.group_id,
-      user_id: createdUserId,
+    // ---- ATOMIC redemption: locks the coupon row, re-verifies, inserts redemption + member,
+    // and increments the count — all in one transaction. No race conditions on seat usage.
+    const { data: rpcResult, error: rpcErr } = await admin.rpc("redeem_group_coupon", {
+      _code: code,
+      _user_id: createdUserId,
     });
-    if (redErr) {
-      log("Redemption insert failed", { error: redErr.message });
-      throw new Error("Could not record coupon redemption.");
-    }
 
-    // 5. Insert group membership as student
-    const { error: memErr } = await admin.from("group_members").insert({
-      group_id: coupon.group_id,
-      user_id: createdUserId,
-      role: "student",
-    });
-    if (memErr && !/duplicate|unique/i.test(memErr.message)) {
-      log("Group member insert failed", { error: memErr.message });
-      throw new Error("Could not add you to the group.");
-    }
-
-    // 6. Increment redemption_count atomically
-    const { error: incErr } = await admin
-      .from("group_coupon_codes")
-      .update({ redemption_count: coupon.redemption_count + 1 })
-      .eq("id", coupon.id)
-      .lt("redemption_count", coupon.max_redemptions);
-
-    if (incErr) {
-      log("Increment failed", { error: incErr.message });
+    if (rpcErr) {
+      log("RPC error", { error: rpcErr.message });
       throw new Error("Could not finalize coupon redemption.");
     }
 
-    log("Registration complete", { userId: createdUserId, groupId: coupon.group_id });
+    const result = rpcResult as { ok: boolean; error?: string } | null;
+    if (!result?.ok) {
+      const reason = result?.error ?? "unknown";
+      log("Redemption rejected", { reason });
+      const userMsg: Record<string, string> = {
+        invalid_code: "Invalid coupon code.",
+        inactive: "This coupon code is no longer active.",
+        expired: "This coupon code has expired.",
+        full: "This coupon code has reached its redemption limit.",
+        already_redeemed: "You have already redeemed this coupon code.",
+      };
+      throw new Error(userMsg[reason] ?? "Could not redeem coupon.");
+    }
+
+    log("Registration complete", { userId: createdUserId });
 
     return json(200, {
       success: true,
@@ -174,6 +207,6 @@ serve(async (req) => {
       }
     }
 
-    return json(500, { error: message });
+    return json(400, { error: message });
   }
 });
