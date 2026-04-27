@@ -8,6 +8,8 @@ interface User {
   fullName: string | null;
   isSubscribed: boolean;
   isAdmin: boolean;
+  isGroupAdmin: boolean;
+  groupId: string | null;
   subscriptionEnd?: string | null;
   subscriptionEndUnix?: number | null;
   subscriptionStatus?: string | null;
