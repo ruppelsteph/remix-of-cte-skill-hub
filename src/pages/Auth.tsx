@@ -61,18 +61,41 @@ const Auth = () => {
           setIsSubmitting(false);
           return;
         }
-        const { success, error } = await signUp(email, password, fullName);
-        if (success) {
+        if (!couponCode.trim()) {
+          toast({
+            variant: "destructive",
+            title: "Coupon code required",
+            description: "Please enter the coupon code provided by your group admin.",
+          });
+          setIsSubmitting(false);
+          return;
+        }
+
+        const { data, error } = await supabase.functions.invoke("register-with-coupon", {
+          body: {
+            email,
+            password,
+            fullName,
+            code: couponCode.trim().toUpperCase(),
+          },
+        });
+
+        const errorMessage =
+          (data as { error?: string } | null)?.error ||
+          error?.message ||
+          "Please try again.";
+
+        if (!error && (data as { success?: boolean } | null)?.success) {
           setShowEmailVerificationMessage(true);
           toast({
             title: "Check your email!",
-            description: "We've sent you a verification link to confirm your account.",
+            description: "Your coupon was redeemed. Verify your email to start learning.",
           });
         } else {
           toast({
             variant: "destructive",
             title: "Sign up failed",
-            description: error || "Please try again.",
+            description: errorMessage,
           });
         }
       }
