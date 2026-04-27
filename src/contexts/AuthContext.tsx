@@ -30,6 +30,8 @@ interface AuthContextType {
   signOut: () => Promise<void>;
   isSubscribed: boolean;
   isAdmin: boolean;
+  isGroupAdmin: boolean;
+  groupId: string | null;
   refreshSubscription: () => Promise<void>;
 }
 
