@@ -35,9 +35,13 @@ serve(async (req) => {
     const body = await req.json();
     const priceId: string | undefined = body?.priceId;
     const groupName: string | undefined = body?.groupName?.toString().trim();
+    const rawSeats = Number(body?.seatCount);
+    const seatCount = Number.isFinite(rawSeats) && rawSeats > 0
+      ? Math.min(Math.floor(rawSeats), 1000)
+      : 25;
     if (!priceId) throw new Error("priceId is required");
     if (!groupName) throw new Error("groupName is required");
-    logStep("Inputs received", { priceId, groupName });
+    logStep("Inputs received", { priceId, groupName, seatCount });
 
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) throw new Error("No authorization header provided");
