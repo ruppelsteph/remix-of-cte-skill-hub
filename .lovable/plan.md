@@ -1,44 +1,105 @@
+## Plan: Add `group_admin` role with groups & group memberships
 
+### Goal
+Introduce a third role (`group_admin`) so a user can own a group and manage students inside it. No purchasing/coupons yet.
 
-## Plan: Make password reset actually work
+---
 
-### Problem
-1. Supabase Site URL is `http://localhost:3000` → recovery emails point to localhost. (Fix in Supabase dashboard, not code.)
-2. The app has no page that consumes the recovery token, so even with the right redirect, users can't set a new password.
-3. The admin "Reset password" button in `AdminUsers.tsx` and any future user-facing "Forgot password?" link both need to send users to a real reset page on the deployed app.
+### 1. Database changes (single migration)
 
-### Code changes
+**a. Extend `app_role` enum**
+- Add `'group_admin'` value to existing `app_role` enum (keeps `user_roles` table as the source of truth — same pattern as `admin`).
 
-**1. New page: `src/pages/ResetPassword.tsx` (route `/auth/reset`)**
-- On mount, listen for the `PASSWORD_RECOVERY` event from `supabase.auth.onAuthStateChange`. When Supabase processes the recovery token in the URL, it fires this event and establishes a temporary recovery session.
-- Show a simple form: new password + confirm password, with the same min-length rules as signup.
-- On submit, call `supabase.auth.updateUser({ password })`.
-- On success: toast, sign the user out, redirect to `/auth` so they can sign in with the new password.
-- Handle the error case where the link is expired or invalid (show a clear message + a "Request a new reset link" button that goes to a forgot-password flow).
+**b. Extend `profiles`**
+- Add `role text not null default 'user'` with a CHECK constraint limiting values to `'user' | 'admin' | 'group_admin'`. This is a denormalized convenience field per the spec; authoritative role checks still go through `user_roles` + `has_role()`.
+- Add `group_id uuid` (nullable) — points to the group a user belongs to (filled in for students and the owning group_admin).
 
-**2. New page: `src/pages/ForgotPassword.tsx` (route `/auth/forgot`)**
-- Email input → calls `supabase.auth.resetPasswordForEmail(email, { redirectTo: \`${window.location.origin}/auth/reset\` })`.
-- Always shows a generic "If that email exists, we've sent a reset link" message (don't reveal whether the email is registered — that's an account-enumeration leak).
+**c. New table: `groups`**
+```
+id          uuid pk default gen_random_uuid()
+name        text not null
+created_by  uuid not null  -- references auth.users(id) implicitly (no FK to auth.users per Lovable rules)
+created_at  timestamptz not null default now()
+```
+- Enable RLS.
+- FK from `profiles.group_id` → `groups(id) on delete set null` added after table exists.
 
-**3. `src/pages/Auth.tsx` — add "Forgot password?" link**
-- Small text link under the password field on the sign-in form, pointing to `/auth/forgot`.
+**d. New table: `group_members`**
+```
+id          uuid pk default gen_random_uuid()
+group_id    uuid not null references public.groups(id) on delete cascade
+user_id     uuid not null
+role        text not null check (role in ('group_admin','student'))
+created_at  timestamptz not null default now()
+unique (group_id, user_id)
+```
+- Enable RLS.
 
-**4. `src/components/admin/AdminUsers.tsx` — fix the admin reset button's redirect**
-- Currently uses `\`${window.location.origin}/auth\``. Change to `\`${window.location.origin}/auth/reset\`` so the recovery link lands on the new reset page instead of the sign-in page (which currently ignores the token).
+**e. Helper security-definer function (avoids RLS recursion)**
+```
+public.is_group_admin_of(_group_id uuid)
+  returns boolean
+  language sql stable security definer set search_path = public
+  as $$
+    select exists (
+      select 1 from public.group_members
+      where group_id = _group_id
+        and user_id = auth.uid()
+        and role = 'group_admin'
+    )
+  $$;
+```
 
-**5. `src/App.tsx` — register the two new routes**
-- `/auth/reset` → `ResetPassword`
-- `/auth/forgot` → `ForgotPassword`
+**f. Trigger: when a user becomes `group_admin`**
+- Trigger on `INSERT` into `public.user_roles` where `role = 'group_admin'`:
+  1. Create a new row in `groups` with `name = 'New Group'` (placeholder, editable later) and `created_by = NEW.user_id`.
+  2. Insert `(group_id, user_id, role='group_admin')` into `group_members`.
+  3. Update the user's `profiles.role = 'group_admin'` and `profiles.group_id = <new group id>`.
+- Mirror trigger to keep `profiles.role` in sync when an `admin` row is inserted/deleted from `user_roles` (so the convenience column stays accurate).
 
-### What you (the user) must do — outside of code
-After I ship the code, you need to update Supabase Auth → URL Configuration:
-- **Site URL** → your live preview / published URL (not localhost).
-- **Redirect URLs** allow-list → add `<your-app-origin>/auth/reset` for every environment you use (preview, published, custom domain, optionally localhost:8080).
+---
 
-I'll include a button below the implementation to jump straight to that settings page.
+### 2. RLS policies
 
-### Out of scope (ask if you want them)
-- Enabling Supabase's "leaked password protection" (also flagged in your security panel) — I can turn that on in the same pass.
-- Customizing the recovery email template with your branding (separate workflow).
-- Rate-limiting the forgot-password endpoint at the app level — Supabase already throttles this server-side.
+**`groups`**
+- SELECT: members of the group OR admins.
+  `is_group_admin_of(id) OR exists(select 1 from group_members where group_id = groups.id and user_id = auth.uid()) OR has_role(auth.uid(),'admin')`
+- UPDATE: group_admin of the group OR site admin.
+- INSERT: site admin only (group_admins get their group via the trigger, not a direct insert).
+- DELETE: site admin only.
 
+**`group_members`**
+- SELECT (own membership): `user_id = auth.uid()`.
+- SELECT (manage): `is_group_admin_of(group_id) OR has_role(auth.uid(),'admin')`.
+- INSERT: `is_group_admin_of(group_id) OR has_role(auth.uid(),'admin')`, with check that the new row's role is `'student'` for group_admins (only site admins can add another `group_admin`).
+- UPDATE / DELETE: `is_group_admin_of(group_id) OR has_role(auth.uid(),'admin')`.
+
+(`profiles` policies stay as-is.)
+
+---
+
+### 3. Frontend changes (minimal — wiring only, no new pages yet)
+
+- **`src/components/admin/AdminUsers.tsx`**
+  - Widen `RoleRow.role` type to `'admin' | 'user' | 'group_admin'`.
+  - Replace the single Demote/Promote button with a small role selector (user / admin / group_admin) that inserts/deletes the corresponding `user_roles` row. Selecting `group_admin` inserts the role; the DB trigger does the rest.
+  - Show the role in the existing Role column (admin / group_admin / user badge).
+- **`src/contexts/AuthContext.tsx`**
+  - Add `isGroupAdmin: boolean` derived from a `has_role(_, 'group_admin')` check (parallel to `checkAdminRole`). Expose on context.
+- **`src/integrations/supabase/types.ts`** is auto-generated — no manual edits.
+
+No new routes/pages this round; group dashboard UI is out of scope per "Do not implement purchasing or coupons yet" and to keep the change small. We can add `/group` admin UI in a follow-up.
+
+---
+
+### 4. Out of scope (call out for later)
+- A dedicated Group Admin dashboard (invite students, list members, rename group).
+- Linking purchases/coupons to groups.
+- Bulk seat assignment, billing per seat.
+
+---
+
+### Technical notes
+- Roles authority remains `public.user_roles` + `has_role()` — no privilege checks read from `profiles.role`. The new `profiles.role` column is only for display convenience and is kept in sync by triggers.
+- `group_id` on `profiles` is nullable; only set automatically for the group_admin's own group. Students get `group_id` populated when added to `group_members` (via trigger).
+- Enum value addition (`alter type ... add value 'group_admin'`) must run in its own statement before being used — handled in the migration ordering.
