@@ -310,6 +310,20 @@ const Pricing = () => {
                 </SelectContent>
               </Select>
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="seat-count">Number of seats</Label>
+              <Input
+                id="seat-count"
+                type="number"
+                min={1}
+                max={1000}
+                value={seatCount}
+                onChange={(e) => setSeatCount(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                We'll generate a coupon code with this many redemptions for your students.
+              </p>
+            </div>
           </div>
           <DialogFooter>
             <Button
