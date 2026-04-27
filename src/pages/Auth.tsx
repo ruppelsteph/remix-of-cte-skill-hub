@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 import { Loader2 } from "lucide-react";
 
 const Auth = () => {
@@ -15,10 +16,11 @@ const Auth = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
+  const [couponCode, setCouponCode] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showEmailVerificationMessage, setShowEmailVerificationMessage] = useState(false);
 
-  const { signIn, signUp, user } = useAuth();
+  const { signIn, user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -59,18 +61,41 @@ const Auth = () => {
           setIsSubmitting(false);
           return;
         }
-        const { success, error } = await signUp(email, password, fullName);
-        if (success) {
+        if (!couponCode.trim()) {
+          toast({
+            variant: "destructive",
+            title: "Coupon code required",
+            description: "Please enter the coupon code provided by your group admin.",
+          });
+          setIsSubmitting(false);
+          return;
+        }
+
+        const { data, error } = await supabase.functions.invoke("register-with-coupon", {
+          body: {
+            email,
+            password,
+            fullName,
+            code: couponCode.trim().toUpperCase(),
+          },
+        });
+
+        const errorMessage =
+          (data as { error?: string } | null)?.error ||
+          error?.message ||
+          "Please try again.";
+
+        if (!error && (data as { success?: boolean } | null)?.success) {
           setShowEmailVerificationMessage(true);
           toast({
             title: "Check your email!",
-            description: "We've sent you a verification link to confirm your account.",
+            description: "Your coupon was redeemed. Verify your email to start learning.",
           });
         } else {
           toast({
             variant: "destructive",
             title: "Sign up failed",
-            description: error || "Please try again.",
+            description: errorMessage,
           });
         }
       }
@@ -171,6 +196,27 @@ const Auth = () => {
                   className="mt-1"
                 />
               </div>
+
+              {mode === "signup" && (
+                <div>
+                  <Label htmlFor="couponCode">Coupon Code</Label>
+                  <Input
+                    id="couponCode"
+                    type="text"
+                    value={couponCode}
+                    onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                    placeholder="CLASS-XXXXXX"
+                    required={mode === "signup"}
+                    autoCapitalize="characters"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    className="mt-1 font-mono tracking-wide uppercase"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Enter the code provided by your group admin to enroll.
+                  </p>
+                </div>
+              )}
 
               <Button type="submit" className="w-full" disabled={isSubmitting}>
                 {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
