@@ -14,6 +14,89 @@ export type Database = {
   }
   public: {
     Tables: {
+      group_coupon_codes: {
+        Row: {
+          code: string
+          created_at: string
+          created_by: string
+          expires_at: string | null
+          group_id: string
+          id: string
+          is_active: boolean
+          max_redemptions: number
+          redemption_count: number
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          created_by: string
+          expires_at?: string | null
+          group_id: string
+          id?: string
+          is_active?: boolean
+          max_redemptions: number
+          redemption_count?: number
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          created_by?: string
+          expires_at?: string | null
+          group_id?: string
+          id?: string
+          is_active?: boolean
+          max_redemptions?: number
+          redemption_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_coupon_codes_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      group_coupon_redemptions: {
+        Row: {
+          coupon_code_id: string
+          group_id: string
+          id: string
+          redeemed_at: string
+          user_id: string
+        }
+        Insert: {
+          coupon_code_id: string
+          group_id: string
+          id?: string
+          redeemed_at?: string
+          user_id: string
+        }
+        Update: {
+          coupon_code_id?: string
+          group_id?: string
+          id?: string
+          redeemed_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_coupon_redemptions_coupon_code_id_fkey"
+            columns: ["coupon_code_id"]
+            isOneToOne: false
+            referencedRelation: "group_coupon_codes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_coupon_redemptions_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       group_members: {
         Row: {
           created_at: string
