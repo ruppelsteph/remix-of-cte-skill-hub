@@ -109,39 +109,47 @@ export function AdminUsers() {
     fetchData();
   }, []);
 
-  const isAdmin = (userId: string) =>
-    roles.some((r) => r.user_id === userId && r.role === "admin");
+  const getRole = (userId: string): AppRole => {
+    if (roles.some((r) => r.user_id === userId && r.role === "admin")) return "admin";
+    if (roles.some((r) => r.user_id === userId && r.role === "group_admin")) return "group_admin";
+    return "user";
+  };
 
   const getSubscription = (userId: string) =>
     subscriptions.find((s) => s.user_id === userId);
 
-  const togglePromotion = async (userId: string) => {
+  const changeRole = async (userId: string, newRole: AppRole) => {
+    const currentRole = getRole(userId);
+    if (currentRole === newRole) return;
+
+    if (currentUser?.id === userId && currentRole === "admin" && newRole !== "admin") {
+      toast({
+        variant: "destructive",
+        title: "Action blocked",
+        description: "You can't remove your own admin role.",
+      });
+      return;
+    }
+
     setUpdatingId(userId);
     try {
-      if (isAdmin(userId)) {
-        if (currentUser?.id === userId) {
-          toast({
-            variant: "destructive",
-            title: "Action blocked",
-            description: "You can't remove your own admin role.",
-          });
-          setUpdatingId(null);
-          return;
-        }
-        const { error } = await supabase
+      // Remove existing privileged roles for this user
+      const { error: delError } = await supabase
+        .from("user_roles")
+        .delete()
+        .eq("user_id", userId)
+        .in("role", ["admin", "group_admin"]);
+      if (delError) throw delError;
+
+      // Insert the new role unless it's plain 'user'
+      if (newRole !== "user") {
+        const { error: insError } = await supabase
           .from("user_roles")
-          .delete()
-          .eq("user_id", userId)
-          .eq("role", "admin");
-        if (error) throw error;
-        toast({ title: "Admin role removed" });
-      } else {
-        const { error } = await supabase
-          .from("user_roles")
-          .insert([{ user_id: userId, role: "admin" }]);
-        if (error) throw error;
-        toast({ title: "Admin role granted" });
+          .insert([{ user_id: userId, role: newRole }]);
+        if (insError) throw insError;
       }
+
+      toast({ title: `Role updated to ${newRole}` });
       await fetchData();
     } catch (err) {
       console.error("Error updating role:", err);
