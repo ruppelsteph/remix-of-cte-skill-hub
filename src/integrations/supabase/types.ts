@@ -563,6 +563,10 @@ export type Database = {
         Returns: boolean
       }
       is_group_admin_of: { Args: { _group_id: string }; Returns: boolean }
+      user_has_group_purchase_access: {
+        Args: { _user_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       app_role: "admin" | "user" | "group_admin"
