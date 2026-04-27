@@ -86,29 +86,33 @@ export function GroupAdminCoupons() {
 
   const regenerate = async (coupon: Coupon) => {
     setBusyId(coupon.id);
-    let attempts = 0;
-    let newCode = generateCode();
-    while (attempts < 5) {
-      const { data: existing } = await supabase
+    // Rely on the unique constraint to detect rare collisions; retry up to 5 times.
+    let lastError: string | null = null;
+    let success = false;
+    let finalCode = "";
+    for (let attempt = 0; attempt < 5 && !success; attempt++) {
+      const newCode = generateCode();
+      const { error } = await supabase
         .from("group_coupon_codes")
-        .select("id")
-        .eq("code", newCode)
-        .maybeSingle();
-      if (!existing) break;
-      newCode = generateCode();
-      attempts++;
+        .update({ code: newCode })
+        .eq("id", coupon.id);
+      if (!error) {
+        success = true;
+        finalCode = newCode;
+      } else if (error.code === "23505") {
+        // Code collision — try a fresh one
+        continue;
+      } else {
+        lastError = error.message;
+        break;
+      }
     }
 
-    const { error } = await supabase
-      .from("group_coupon_codes")
-      .update({ code: newCode })
-      .eq("id", coupon.id);
-
-    if (error) {
-      toast.error("Failed to regenerate: " + error.message);
-    } else {
-      toast.success(`New code: ${newCode}`);
+    if (success) {
+      toast.success(`New code: ${finalCode}`);
       await load();
+    } else {
+      toast.error("Failed to regenerate: " + (lastError ?? "code collision"));
     }
     setBusyId(null);
   };
