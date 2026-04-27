@@ -52,7 +52,7 @@ const Index = () => {
               Master Real-World Skills with{" "}
               <span className="text-primary">CTE Skills</span>
             </h1>
-            <p className="text-lg md:text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
+            <p className="text-lg md:text-xl text-secondary-foreground/80 mb-8 max-w-2xl mx-auto">
               High-quality training videos for students, teachers, and schools. 
               Covering all major CTE pathways from Health Science to Manufacturing.
             </p>
