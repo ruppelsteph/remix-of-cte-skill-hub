@@ -41,7 +41,7 @@ interface VideoData {
   thumbnail_url: string | null;
   video_url: string | null; // populated from video_sources, not videos
   duration: string | null;
-  pathway_id: string | null;
+  category_id_new: number | null;
   skill_level?: string;
   is_free: boolean;
   is_active: boolean;
@@ -49,19 +49,19 @@ interface VideoData {
   created_at: string;
 }
 
-interface Pathway {
-  id: string;
-  title: string;
+interface Category {
+  id: number;
+  name: string;
 }
 
 export function AdminVideos() {
   const [videos, setVideos] = useState<VideoData[]>([]);
-  const [pathways, setPathways] = useState<Pathway[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingVideo, setEditingVideo] = useState<VideoData | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-  const [filterPathway, setFilterPathway] = useState<string>("all");
+  const [filterCategory, setFilterCategory] = useState<string>("all");
   const [quickEditVideo, setQuickEditVideo] = useState<VideoData | null>(null);
   const [quickDescription, setQuickDescription] = useState("");
   const [isQuickSaving, setIsQuickSaving] = useState(false);
@@ -73,7 +73,7 @@ export function AdminVideos() {
     thumbnail_url: "",
     video_url: "",
     duration: "",
-    pathway_id: "",
+    category_id_new: "" as string,
     skill_level: "beginner",
     is_free: false,
     is_active: true,
@@ -82,14 +82,14 @@ export function AdminVideos() {
   const fetchData = async () => {
     setIsLoading(true);
     try {
-      const [videosRes, pathwaysRes, sourcesRes] = await Promise.all([
+      const [videosRes, categoriesRes, sourcesRes] = await Promise.all([
         supabase.from("videos").select("*").order("created_at", { ascending: false }),
-        supabase.from("pathways").select("id, title"),
+        supabase.from("categories").select("id, name").eq("is_active", true).order("name"),
         supabase.from("video_sources").select("video_id, video_url"),
       ]);
 
       if (videosRes.error) throw videosRes.error;
-      if (pathwaysRes.error) throw pathwaysRes.error;
+      if (categoriesRes.error) throw categoriesRes.error;
       if (sourcesRes.error) throw sourcesRes.error;
 
       const urlByVideo = new Map<string, string>(
@@ -102,7 +102,7 @@ export function AdminVideos() {
       }));
 
       setVideos(merged);
-      setPathways(pathwaysRes.data || []);
+      setCategories(categoriesRes.data || []);
     } catch (err) {
       console.error("Error fetching data:", err);
       toast({
@@ -119,6 +119,7 @@ export function AdminVideos() {
     fetchData();
   }, []);
 
+
   const resetForm = () => {
     setFormData({
       title: "",
@@ -126,7 +127,7 @@ export function AdminVideos() {
       thumbnail_url: "",
       video_url: "",
       duration: "",
-      pathway_id: "",
+      category_id_new: "",
       skill_level: "beginner",
       is_free: false,
       is_active: true,
@@ -142,7 +143,7 @@ export function AdminVideos() {
       thumbnail_url: video.thumbnail_url || "",
       video_url: video.video_url || "",
       duration: video.duration || "",
-      pathway_id: video.pathway_id || "",
+      category_id_new: video.category_id_new ? String(video.category_id_new) : "",
       skill_level: video.skill_level || "beginner",
       is_free: video.is_free,
       is_active: video.is_active,
@@ -160,7 +161,7 @@ export function AdminVideos() {
         description: formData.description || null,
         thumbnail_url: formData.thumbnail_url || null,
         duration: formData.duration || null,
-        pathway_id: formData.pathway_id || null,
+        category_id_new: formData.category_id_new ? Number(formData.category_id_new) : null,
         skill_level: formData.skill_level,
         is_free: formData.is_free,
         is_active: formData.is_active,
@@ -268,17 +269,17 @@ export function AdminVideos() {
     }
   };
 
-  const getPathwayTitle = (pathwayId: string | null) => {
-    if (!pathwayId) return "—";
-    const pathway = pathways.find((p) => p.id === pathwayId);
-    return pathway?.title || "—";
+  const getCategoryName = (categoryId: number | null) => {
+    if (!categoryId) return "—";
+    const category = categories.find((c) => c.id === categoryId);
+    return category?.name || "—";
   };
 
-  const filteredVideos = filterPathway === "all"
+  const filteredVideos = filterCategory === "all"
     ? videos
-    : filterPathway === "none"
-    ? videos.filter((v) => !v.pathway_id)
-    : videos.filter((v) => v.pathway_id === filterPathway);
+    : filterCategory === "none"
+    ? videos.filter((v) => !v.category_id_new)
+    : videos.filter((v) => v.category_id_new === Number(filterCategory));
 
   return (
     <Card>
@@ -370,19 +371,19 @@ export function AdminVideos() {
                     />
                   </div>
                   <div>
-                    <Label htmlFor="pathway">Pathway</Label>
+                    <Label htmlFor="category">Category</Label>
                     <Select
-                      value={formData.pathway_id || "none"}
-                      onValueChange={(value) => setFormData({ ...formData, pathway_id: value === "none" ? "" : value })}
+                      value={formData.category_id_new || "none"}
+                      onValueChange={(value) => setFormData({ ...formData, category_id_new: value === "none" ? "" : value })}
                     >
                       <SelectTrigger>
-                        <SelectValue placeholder="Select pathway" />
+                        <SelectValue placeholder="Select category" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="none">None</SelectItem>
-                        {pathways.map((p) => (
-                          <SelectItem key={p.id} value={p.id}>
-                            {p.title}
+                        {categories.map((c) => (
+                          <SelectItem key={c.id} value={String(c.id)}>
+                            {c.name}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -443,23 +444,23 @@ export function AdminVideos() {
         <div className="flex items-center gap-4 mb-4">
           <div className="flex items-center gap-2">
             <Filter className="h-4 w-4 text-muted-foreground" />
-            <Select value={filterPathway} onValueChange={setFilterPathway}>
-              <SelectTrigger className="w-[200px]">
-                <SelectValue placeholder="Filter by pathway" />
+            <Select value={filterCategory} onValueChange={setFilterCategory}>
+              <SelectTrigger className="w-[220px]">
+                <SelectValue placeholder="Filter by category" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Pathways</SelectItem>
-                <SelectItem value="none">No Pathway</SelectItem>
-                {pathways.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    {p.title}
+                <SelectItem value="all">All Categories</SelectItem>
+                <SelectItem value="none">No Category</SelectItem>
+                {categories.map((c) => (
+                  <SelectItem key={c.id} value={String(c.id)}>
+                    {c.name}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
-          {filterPathway !== "all" && (
-            <Button variant="ghost" size="sm" onClick={() => setFilterPathway("all")}>
+          {filterCategory !== "all" && (
+            <Button variant="ghost" size="sm" onClick={() => setFilterCategory("all")}>
               <X className="h-4 w-4 mr-1" />
               Clear
             </Button>
@@ -481,7 +482,7 @@ export function AdminVideos() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Title</TableHead>
-                  <TableHead>Pathway</TableHead>
+                  <TableHead>Category</TableHead>
                   <TableHead>Duration</TableHead>
                   <TableHead>Views</TableHead>
                   <TableHead>Status</TableHead>
@@ -499,7 +500,7 @@ export function AdminVideos() {
                         )}
                       </div>
                     </TableCell>
-                    <TableCell>{getPathwayTitle(video.pathway_id)}</TableCell>
+                    <TableCell>{getCategoryName(video.category_id_new)}</TableCell>
                     <TableCell>{video.duration || "-"}</TableCell>
                     <TableCell>{video.view_count}</TableCell>
                     <TableCell>
