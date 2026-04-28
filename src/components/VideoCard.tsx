@@ -8,10 +8,11 @@ import type { Tables } from "@/integrations/supabase/types";
 interface VideoCardProps {
   video: Tables<"videos">;
   pathway?: Tables<"pathways"> | null;
+  categoryName?: string | null;
   index?: number;
 }
 
-export function VideoCard({ video, pathway, index = 0 }: VideoCardProps) {
+export function VideoCard({ video, pathway, categoryName, index = 0 }: VideoCardProps) {
   const [imageError, setImageError] = useState(false);
   
   // Parse duration from string format (e.g., "18:30" or "18 min")
@@ -86,9 +87,9 @@ export function VideoCard({ video, pathway, index = 0 }: VideoCardProps) {
       {/* Content */}
       <div className="p-4">
         <div className="flex flex-wrap gap-1.5 mb-2">
-          {pathway && (
+          {(categoryName || pathway) && (
             <Badge variant="secondary" className="text-xs">
-              {pathway.title}
+              {categoryName || pathway?.title}
             </Badge>
           )}
           {getSkillLevelLabel() && (
