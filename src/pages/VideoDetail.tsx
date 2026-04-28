@@ -1,6 +1,6 @@
 import { useParams, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Clock, Lock, Play, Loader2 } from "lucide-react";
+import { ArrowLeft, Clock, Lock, Loader2 } from "lucide-react";
 import { Layout } from "@/components/layout/Layout";
 import { VideoCard } from "@/components/VideoCard";
 import { Button } from "@/components/ui/button";
@@ -28,24 +28,29 @@ export default function VideoDetail() {
     enabled: !!id,
   });
 
-  // Fetch the playable URL separately — RLS on video_sources only returns
-  // it to free viewers, active subscribers, granted users, or admins.
-  const { data: videoSource } = useQuery({
-    queryKey: ["video-source", id, user?.id, isSubscribed],
+  // Fetch all sources the viewer is allowed to see. RLS returns:
+  //  - the YouTube preview (is_preview=true) to everyone
+  //  - the Vimeo full video (is_preview=false) only to subscribers, granted users, or admins
+  const { data: videoSources = [] } = useQuery({
+    queryKey: ["video-sources", id, user?.id, isSubscribed],
     queryFn: async () => {
-      if (!id) return null;
+      if (!id) return [];
       const { data, error } = await supabase
         .from("video_sources")
-        .select("video_url")
-        .eq("video_id", id)
-        .maybeSingle();
+        .select("video_url, is_preview, kind")
+        .eq("video_id", id);
       if (error) throw error;
-      return data;
+      return data ?? [];
     },
     enabled: !!id,
   });
 
-  const videoUrl = videoSource?.video_url ?? null;
+  // Prefer the full Vimeo source when accessible; otherwise fall back to the YouTube preview.
+  const fullSource = videoSources.find((s) => s.is_preview === false) ?? null;
+  const previewSource = videoSources.find((s) => s.is_preview === true) ?? null;
+  const activeSource = fullSource ?? previewSource;
+  const videoUrl = activeSource?.video_url ?? null;
+  const isPlayingPreview = !fullSource && !!previewSource;
 
   // Fetch all pathways
   const { data: pathways = [] } = useQuery({
@@ -103,8 +108,23 @@ export default function VideoDetail() {
 
   const pathway = pathways.find(p => p.id === video.pathway_id);
 
-  // Check if user can access video (subscribed or video is free)
-  const canWatch = isSubscribed || video.is_free;
+  // Anyone can play whatever source they have access to. Subscribers get the full Vimeo
+  // video; everyone else gets the YouTube preview when one exists.
+  const canWatch = !!videoUrl;
+
+  // Build an embeddable URL for the active source.
+  const buildEmbedUrl = (url: string) => {
+    if (url.includes("youtube.com") || url.includes("youtu.be")) {
+      return url
+        .replace("watch?v=", "embed/")
+        .replace("youtu.be/", "youtube.com/embed/");
+    }
+    if (url.includes("vimeo.com")) {
+      const m = url.match(/vimeo\.com\/(\d+)/);
+      if (m) return `https://player.vimeo.com/video/${m[1]}`;
+    }
+    return url;
+  };
 
   return (
     <Layout>
@@ -124,48 +144,16 @@ export default function VideoDetail() {
             <div className="lg:col-span-2">
               {/* Video Player */}
               <div className="relative aspect-video rounded-xl overflow-hidden bg-secondary shadow-lg">
-                {canWatch ? (
-                  // User can watch - show player
-                  videoUrl ? (
-                    videoUrl.includes("youtube.com") || videoUrl.includes("youtu.be") ? (
-                      <iframe
-                        src={videoUrl.replace("watch?v=", "embed/").replace("youtu.be/", "youtube.com/embed/")}
-                        className="h-full w-full"
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                        allowFullScreen
-                      />
-                    ) : (
-                      <video
-                        src={videoUrl}
-                        controls
-                        className="h-full w-full"
-                        poster={video.thumbnail_url || undefined}
-                      >
-                        Your browser does not support the video tag.
-                      </video>
-                    )
-                  ) : (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center text-secondary-foreground">
-                      {video.thumbnail_url && (
-                        <img
-                          src={video.thumbnail_url}
-                          alt={video.title}
-                          className="absolute inset-0 h-full w-full object-cover opacity-50"
-                        />
-                      )}
-                      <div className="relative z-10 text-center">
-                        <div className="h-16 w-16 rounded-full bg-primary flex items-center justify-center mx-auto mb-4">
-                          <Play className="h-8 w-8 text-primary-foreground fill-current ml-1" />
-                        </div>
-                        <p className="text-lg font-medium">Video Coming Soon</p>
-                        <p className="text-sm text-secondary-foreground/70">
-                          This video is being prepared
-                        </p>
-                      </div>
-                    </div>
-                  )
+                {videoUrl ? (
+                  <iframe
+                    key={videoUrl}
+                    src={buildEmbedUrl(videoUrl)}
+                    className="h-full w-full"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                  />
                 ) : (
-                  // Non-subscribed user - show locked state
+                  // No source the viewer can access — show locked state
                   <div className="absolute inset-0">
                     {video.thumbnail_url && (
                       <img
@@ -181,7 +169,7 @@ export default function VideoDetail() {
                       <h3 className="text-xl font-semibold mb-2">Subscribe to Watch</h3>
                       <p className="text-sm text-white/70 mb-6 max-w-sm text-center">
                         {user
-                          ? "Upgrade your account to access all training videos."
+                          ? "Upgrade your account to access this training video."
                           : "Sign in or create an account to start learning."}
                       </p>
                       <div className="flex gap-3">
@@ -204,6 +192,23 @@ export default function VideoDetail() {
                   </div>
                 )}
               </div>
+
+              {/* Preview banner — shown when the user is watching the free YouTube preview */}
+              {isPlayingPreview && (
+                <div className="mt-3 flex flex-col gap-3 rounded-lg border border-primary/20 bg-primary/5 p-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="font-medium text-sm">You're watching the free preview</p>
+                    <p className="text-sm text-muted-foreground">
+                      Subscribe to unlock the full-length video.
+                    </p>
+                  </div>
+                  <Button asChild size="sm">
+                    <Link to={user ? "/pricing" : "/auth?mode=signup"}>
+                      {user ? "View Plans" : "Get Started"}
+                    </Link>
+                  </Button>
+                </div>
+              )}
 
               {/* Video Info */}
               <div className="mt-6">
@@ -240,7 +245,7 @@ export default function VideoDetail() {
             {/* Sidebar */}
             <div className="space-y-6">
               {/* Subscription CTA for non-subscribers */}
-              {!canWatch && (
+              {!fullSource && (
                 <div className="rounded-xl bg-primary/5 border border-primary/20 p-6">
                   <h3 className="font-heading font-semibold text-lg">
                     Unlock Full Access
