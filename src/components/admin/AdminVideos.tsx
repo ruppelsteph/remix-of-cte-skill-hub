@@ -285,16 +285,36 @@ export function AdminVideos() {
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
           <span>Video Management</span>
-          <Dialog open={isDialogOpen} onOpenChange={(open) => {
-            setIsDialogOpen(open);
-            if (!open) resetForm();
-          }}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="h-4 w-4 mr-2" />
-                Add Video
-              </Button>
-            </DialogTrigger>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={async () => {
+                if (!confirm("Import seed videos from CSV? Existing rows with the same slug will be updated.")) return;
+                try {
+                  const { data, error } = await supabase.functions.invoke("import-videos-seed");
+                  if (error) throw error;
+                  toast({
+                    title: "Seed import complete",
+                    description: `Inserted/updated ${data.videos_inserted} videos and ${data.sources_inserted} sources. Errors: ${data.error_count}.`,
+                  });
+                  fetchVideos();
+                } catch (e: any) {
+                  toast({ title: "Seed import failed", description: e.message, variant: "destructive" });
+                }
+              }}
+            >
+              Import Seed Videos
+            </Button>
+            <Dialog open={isDialogOpen} onOpenChange={(open) => {
+              setIsDialogOpen(open);
+              if (!open) resetForm();
+            }}>
+              <DialogTrigger asChild>
+                <Button>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Video
+                </Button>
+              </DialogTrigger>
             <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>{editingVideo ? "Edit Video" : "Add New Video"}</DialogTitle>
