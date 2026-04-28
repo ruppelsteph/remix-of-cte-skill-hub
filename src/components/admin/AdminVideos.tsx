@@ -435,6 +435,7 @@ export function AdminVideos() {
               </form>
             </DialogContent>
           </Dialog>
+          </div>
         </CardTitle>
       </CardHeader>
       <CardContent>
