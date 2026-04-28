@@ -245,7 +245,7 @@ export default function VideoDetail() {
             {/* Sidebar */}
             <div className="space-y-6">
               {/* Subscription CTA for non-subscribers */}
-              {!canWatch && (
+              {!fullSource && (
                 <div className="rounded-xl bg-primary/5 border border-primary/20 p-6">
                   <h3 className="font-heading font-semibold text-lg">
                     Unlock Full Access
