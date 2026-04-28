@@ -108,8 +108,23 @@ export default function VideoDetail() {
 
   const pathway = pathways.find(p => p.id === video.pathway_id);
 
-  // Check if user can access video (subscribed or video is free)
-  const canWatch = isSubscribed || video.is_free;
+  // Anyone can play whatever source they have access to. Subscribers get the full Vimeo
+  // video; everyone else gets the YouTube preview when one exists.
+  const canWatch = !!videoUrl;
+
+  // Build an embeddable URL for the active source.
+  const buildEmbedUrl = (url: string) => {
+    if (url.includes("youtube.com") || url.includes("youtu.be")) {
+      return url
+        .replace("watch?v=", "embed/")
+        .replace("youtu.be/", "youtube.com/embed/");
+    }
+    if (url.includes("vimeo.com")) {
+      const m = url.match(/vimeo\.com\/(\d+)/);
+      if (m) return `https://player.vimeo.com/video/${m[1]}`;
+    }
+    return url;
+  };
 
   return (
     <Layout>
