@@ -534,6 +534,8 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          is_preview: boolean
+          kind: string
           updated_at: string
           video_id: string
           video_url: string
@@ -541,6 +543,8 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          is_preview?: boolean
+          kind?: string
           updated_at?: string
           video_id: string
           video_url: string
@@ -548,6 +552,8 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          is_preview?: boolean
+          kind?: string
           updated_at?: string
           video_id?: string
           video_url?: string
@@ -574,6 +580,7 @@ export type Database = {
           is_free: boolean | null
           pathway_id: string | null
           skill_level: string | null
+          slug: string | null
           thumbnail_url: string | null
           title: string
           updated_at: string
@@ -590,6 +597,7 @@ export type Database = {
           is_free?: boolean | null
           pathway_id?: string | null
           skill_level?: string | null
+          slug?: string | null
           thumbnail_url?: string | null
           title: string
           updated_at?: string
@@ -606,6 +614,7 @@ export type Database = {
           is_free?: boolean | null
           pathway_id?: string | null
           skill_level?: string | null
+          slug?: string | null
           thumbnail_url?: string | null
           title?: string
           updated_at?: string

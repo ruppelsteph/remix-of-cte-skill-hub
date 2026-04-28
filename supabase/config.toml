@@ -26,3 +26,6 @@ verify_jwt = false
 
 [functions.group-admin-students]
 verify_jwt = false
+
+[functions.import-videos-seed]
+verify_jwt = false
