@@ -297,7 +297,7 @@ export function AdminVideos() {
                     title: "Seed import complete",
                     description: `Inserted/updated ${data.videos_inserted} videos and ${data.sources_inserted} sources. Errors: ${data.error_count}.`,
                   });
-                  fetchVideos();
+                  fetchData();
                 } catch (e: any) {
                   toast({ title: "Seed import failed", description: e.message, variant: "destructive" });
                 }
