@@ -18,7 +18,7 @@ import { supabase } from "@/integrations/supabase/client";
 export default function Videos() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [searchQuery, setSearchQuery] = useState(searchParams.get("q") || "");
-  const [selectedPathway, setSelectedPathway] = useState(searchParams.get("pathway") || "all");
+  const [selectedCategory, setSelectedCategory] = useState(searchParams.get("category") || "all");
 
   // Fetch videos from Supabase
   const { data: videos = [], isLoading: videosLoading } = useQuery({
@@ -34,15 +34,15 @@ export default function Videos() {
     },
   });
 
-  // Fetch pathways from Supabase
-  const { data: pathways = [] } = useQuery({
-    queryKey: ["pathways"],
+  // Fetch categories from Supabase
+  const { data: categories = [] } = useQuery({
+    queryKey: ["categories"],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("pathways")
+        .from("categories")
         .select("*")
         .eq("is_active", true)
-        .order("title");
+        .order("name");
       if (error) throw error;
       return data;
     },
@@ -61,22 +61,25 @@ export default function Videos() {
         }
       }
 
-      // Pathway filter
-      if (selectedPathway !== "all" && video.pathway_id !== selectedPathway) {
-        return false;
+      // Category filter
+      if (selectedCategory !== "all") {
+        const catId = Number(selectedCategory);
+        if (video.category_id_new !== catId) {
+          return false;
+        }
       }
 
       return true;
     });
-  }, [videos, searchQuery, selectedPathway]);
+  }, [videos, searchQuery, selectedCategory]);
 
   const clearFilters = () => {
     setSearchQuery("");
-    setSelectedPathway("all");
+    setSelectedCategory("all");
     setSearchParams({});
   };
 
-  const hasActiveFilters = searchQuery || selectedPathway !== "all";
+  const hasActiveFilters = searchQuery || selectedCategory !== "all";
 
   return (
     <Layout>
@@ -111,15 +114,15 @@ export default function Videos() {
                 <span>Filters:</span>
               </div>
 
-              <Select value={selectedPathway} onValueChange={setSelectedPathway}>
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="CTE Pathway" />
+              <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                <SelectTrigger className="w-[220px]">
+                  <SelectValue placeholder="Category" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Pathways</SelectItem>
-                  {pathways.map((pathway) => (
-                    <SelectItem key={pathway.id} value={pathway.id}>
-                      {pathway.title}
+                  <SelectItem value="all">All Categories</SelectItem>
+                  {categories.map((category) => (
+                    <SelectItem key={category.id} value={String(category.id)}>
+                      {category.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -146,14 +149,17 @@ export default function Videos() {
             </div>
           ) : filteredVideos.length > 0 ? (
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {filteredVideos.map((video, index) => (
-                <VideoCard 
-                  key={video.id} 
-                  video={video} 
-                  pathway={pathways.find(p => p.id === video.pathway_id)}
-                  index={index} 
-                />
-              ))}
+              {filteredVideos.map((video, index) => {
+                const category = categories.find(c => c.id === video.category_id_new);
+                return (
+                  <VideoCard
+                    key={video.id}
+                    video={video}
+                    categoryName={category?.name}
+                    index={index}
+                  />
+                );
+              })}
             </div>
           ) : (
             <div className="py-16 text-center">
