@@ -28,24 +28,29 @@ export default function VideoDetail() {
     enabled: !!id,
   });
 
-  // Fetch the playable URL separately — RLS on video_sources only returns
-  // it to free viewers, active subscribers, granted users, or admins.
-  const { data: videoSource } = useQuery({
-    queryKey: ["video-source", id, user?.id, isSubscribed],
+  // Fetch all sources the viewer is allowed to see. RLS returns:
+  //  - the YouTube preview (is_preview=true) to everyone
+  //  - the Vimeo full video (is_preview=false) only to subscribers, granted users, or admins
+  const { data: videoSources = [] } = useQuery({
+    queryKey: ["video-sources", id, user?.id, isSubscribed],
     queryFn: async () => {
-      if (!id) return null;
+      if (!id) return [];
       const { data, error } = await supabase
         .from("video_sources")
-        .select("video_url")
-        .eq("video_id", id)
-        .maybeSingle();
+        .select("video_url, is_preview, kind")
+        .eq("video_id", id);
       if (error) throw error;
-      return data;
+      return data ?? [];
     },
     enabled: !!id,
   });
 
-  const videoUrl = videoSource?.video_url ?? null;
+  // Prefer the full Vimeo source when accessible; otherwise fall back to the YouTube preview.
+  const fullSource = videoSources.find((s) => s.is_preview === false) ?? null;
+  const previewSource = videoSources.find((s) => s.is_preview === true) ?? null;
+  const activeSource = fullSource ?? previewSource;
+  const videoUrl = activeSource?.video_url ?? null;
+  const isPlayingPreview = !fullSource && !!previewSource;
 
   // Fetch all pathways
   const { data: pathways = [] } = useQuery({
