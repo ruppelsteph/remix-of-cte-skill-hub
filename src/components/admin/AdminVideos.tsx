@@ -434,50 +434,39 @@ export function AdminVideos() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Video Source</Label>
-                  <div className="grid grid-cols-[140px_1fr] gap-2">
-                    <Select
-                      value={formData.video_provider}
-                      onValueChange={(value: "youtube" | "vimeo" | "other") => {
-                        setFormData({ ...formData, video_provider: value });
-                        setVideoInputError(null);
-                      }}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="youtube">YouTube</SelectItem>
-                        <SelectItem value="vimeo">Vimeo</SelectItem>
-                        <SelectItem value="other">Other (full URL)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <Input
-                      id="video_input"
-                      value={formData.video_input}
-                      onChange={(e) => {
-                        setFormData({ ...formData, video_input: e.target.value });
-                        if (videoInputError) setVideoInputError(null);
-                      }}
-                      placeholder={
-                        formData.video_provider === "youtube"
-                          ? "Video ID (e.g. dQw4w9WgXcQ) or full URL"
-                          : formData.video_provider === "vimeo"
-                          ? "Numeric ID (e.g. 123456789) or full URL"
-                          : "https://..."
-                      }
-                    />
-                  </div>
+                  <Label htmlFor="vimeo_input">Vimeo Video (full)</Label>
+                  <Input
+                    id="vimeo_input"
+                    value={formData.vimeo_input}
+                    onChange={(e) => {
+                      setFormData({ ...formData, vimeo_input: e.target.value });
+                      if (vimeoInputError) setVimeoInputError(null);
+                    }}
+                    placeholder="Numeric ID (e.g. 123456789) or full vimeo.com URL"
+                  />
                   <p className="text-xs text-muted-foreground">
-                    {formData.video_provider === "youtube" &&
-                      "Paste just the YouTube video ID or any full YouTube URL (watch, youtu.be, embed, shorts)."}
-                    {formData.video_provider === "vimeo" &&
-                      "Paste just the numeric Vimeo ID or a full vimeo.com URL."}
-                    {formData.video_provider === "other" &&
-                      "Paste a full embeddable URL starting with http:// or https://."}
+                    Shown to subscribers and users with access. Leave blank to remove.
                   </p>
-                  {videoInputError && (
-                    <p className="text-xs text-destructive">{videoInputError}</p>
+                  {vimeoInputError && (
+                    <p className="text-xs text-destructive">{vimeoInputError}</p>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="youtube_input">YouTube Preview</Label>
+                  <Input
+                    id="youtube_input"
+                    value={formData.youtube_input}
+                    onChange={(e) => {
+                      setFormData({ ...formData, youtube_input: e.target.value });
+                      if (youtubeInputError) setYoutubeInputError(null);
+                    }}
+                    placeholder="Video ID (e.g. dQw4w9WgXcQ) or full YouTube URL"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Free preview shown to all visitors. Leave blank to remove.
+                  </p>
+                  {youtubeInputError && (
+                    <p className="text-xs text-destructive">{youtubeInputError}</p>
                   )}
                 </div>
                 <div>
