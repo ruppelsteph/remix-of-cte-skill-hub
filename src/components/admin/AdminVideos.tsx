@@ -84,7 +84,7 @@ export function AdminVideos() {
     try {
       const [videosRes, categoriesRes, sourcesRes] = await Promise.all([
         supabase.from("videos").select("*").order("created_at", { ascending: false }),
-        supabase.from("categories").select("id, name").eq("is_active", true).order("name"),
+        supabase.from("categories").select("id, name").order("name"),
         supabase.from("video_sources").select("video_id, video_url"),
       ]);
 
