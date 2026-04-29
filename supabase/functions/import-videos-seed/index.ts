@@ -82,22 +82,21 @@ serve(async (req) => {
       videosUpserted++;
       if (thumbnail_url) thumbnailsSet++;
 
-      // Only fill missing: skip if this video already has any source rows.
-      const { count: existingCount, error: cErr } = await supabase
+      // Fetch existing sources for this video so we can fill missing kinds individually.
+      const { data: existing, error: cErr } = await supabase
         .from("video_sources")
-        .select("id", { count: "exact", head: true })
+        .select("kind")
         .eq("video_id", vid.id);
       if (cErr) {
-        errors.push(`${r.slug} count: ${cErr.message}`);
+        errors.push(`${r.slug} fetch sources: ${cErr.message}`);
         continue;
       }
-      if ((existingCount ?? 0) > 0) {
-        videosSkipped++;
-        continue;
-      }
+      const hasYoutube = (existing ?? []).some((s) => s.kind === "youtube");
+      const hasVimeo = (existing ?? []).some((s) => s.kind === "vimeo");
 
       const sources: Array<Record<string, unknown>> = [];
-      if (r.yt) {
+      // YouTube preview = the short, free video everyone can watch.
+      if (r.yt && !hasYoutube) {
         sources.push({
           video_id: vid.id,
           video_url: `https://www.youtube.com/watch?v=${r.yt}`,
@@ -105,7 +104,8 @@ serve(async (req) => {
           kind: "youtube",
         });
       }
-      if (r.vm) {
+      // Vimeo = the full video, gated behind subscription/access.
+      if (r.vm && !hasVimeo) {
         sources.push({
           video_id: vid.id,
           video_url: `https://vimeo.com/${r.vm}`,
@@ -113,11 +113,13 @@ serve(async (req) => {
           kind: "vimeo",
         });
       }
-      if (sources.length) {
-        const { error: sErr } = await supabase.from("video_sources").insert(sources);
-        if (sErr) errors.push(`${r.slug} sources: ${sErr.message}`);
-        else sourcesInserted += sources.length;
+      if (sources.length === 0) {
+        videosSkipped++;
+        continue;
       }
+      const { error: sErr } = await supabase.from("video_sources").insert(sources);
+      if (sErr) errors.push(`${r.slug} sources: ${sErr.message}`);
+      else sourcesInserted += sources.length;
     }
 
     return new Response(
