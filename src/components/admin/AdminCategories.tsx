@@ -59,6 +59,18 @@ const slugify = (s: string) =>
     .replace(/\s+/g, "-")
     .replace(/-+/g, "-");
 
+const stripHtml = (s: string) =>
+  s
+    .replace(/<[^>]*>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\s+/g, " ")
+    .trim();
+
 export function AdminCategories() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [videoCounts, setVideoCounts] = useState<Map<number, number>>(new Map());
@@ -494,8 +506,8 @@ function CategoryRow({ node, onView, onAddChild, onEdit, onDelete }: CategoryRow
                 </Badge>
               )}
             </div>
-            {node.description && (
-              <p className="text-xs text-muted-foreground truncate">{node.description}</p>
+            {node.description && stripHtml(node.description) && (
+              <p className="text-xs text-muted-foreground truncate">{stripHtml(node.description)}</p>
             )}
           </div>
         </div>
