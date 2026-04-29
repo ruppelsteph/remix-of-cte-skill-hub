@@ -1,18 +1,11 @@
 import { useState, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Search, Filter, X, Loader2, ChevronRight, FolderOpen } from "lucide-react";
+import { Search, X, Loader2, ChevronRight, FolderOpen } from "lucide-react";
 import { Layout } from "@/components/layout/Layout";
 import { VideoCard } from "@/components/VideoCard";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -24,6 +17,10 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 
+import industrialImg from "@/assets/category-industrial.jpg";
+import buildingsImg from "@/assets/category-buildings-trades.jpg";
+import cosmetologyImg from "@/assets/category-cosmetology.jpg";
+
 type Category = {
   id: number;
   name: string;
@@ -33,6 +30,12 @@ type Category = {
   is_active: boolean;
 };
 
+const CATEGORY_IMAGE_BY_SLUG: Record<string, string> = {
+  industrial: industrialImg,
+  "buildings-trades": buildingsImg,
+  cosmetology: cosmetologyImg,
+};
+
 export default function Videos() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [searchQuery, setSearchQuery] = useState(searchParams.get("q") || "");
@@ -40,7 +43,6 @@ export default function Videos() {
   const [categoryPath, setCategoryPath] = useState<number[]>(
     initialPath ? initialPath.split(",").map(Number).filter(Boolean) : []
   );
-  const [subFilter, setSubFilter] = useState<string>("all");
 
   const { data: videos = [], isLoading: videosLoading } = useQuery({
     queryKey: ["videos"],
@@ -68,7 +70,6 @@ export default function Videos() {
     },
   });
 
-  // Build helpers
   const categoriesById = useMemo(() => {
     const map = new Map<number, Category>();
     categories.forEach((c) => map.set(c.id, c));
@@ -85,36 +86,44 @@ export default function Videos() {
     return map;
   }, [categories]);
 
-  const topLevel = childrenOf.get(null) || [];
   const currentCategoryId = categoryPath[categoryPath.length - 1] ?? null;
-  const currentChildren = childrenOf.get(currentCategoryId) || [];
+  const currentChildren = currentCategoryId == null
+    ? (childrenOf.get(null) || [])
+    : (childrenOf.get(currentCategoryId) || []);
 
-  // Recursively gather all descendant category ids (incl. self)
-  const descendantIds = useMemo(() => {
-    if (currentCategoryId == null) return null;
+  // Recursively gather all descendant category ids (including the given id)
+  const collectDescendants = (id: number): Set<number> => {
     const ids = new Set<number>();
-    const walk = (id: number) => {
-      ids.add(id);
-      (childrenOf.get(id) || []).forEach((c) => walk(c.id));
+    const walk = (cid: number) => {
+      ids.add(cid);
+      (childrenOf.get(cid) || []).forEach((c) => walk(c.id));
     };
-    walk(currentCategoryId);
+    walk(id);
     return ids;
-  }, [currentCategoryId, childrenOf]);
-
-  // Count videos per top-level category (recursive)
-  const countVideosUnder = (catId: number): number => {
-    const ids = new Set<number>();
-    const walk = (id: number) => {
-      ids.add(id);
-      (childrenOf.get(id) || []).forEach((c) => walk(c.id));
-    };
-    walk(catId);
-    return videos.filter((v) => v.category_id_new && ids.has(v.category_id_new as number)).length;
   };
+
+  const countVideosUnder = (catId: number): number => {
+    const ids = collectDescendants(catId);
+    return videos.filter(
+      (v) => v.category_id_new && ids.has(v.category_id_new as number)
+    ).length;
+  };
+
+  // What to render: leaf categories show videos, otherwise show subcategories.
+  const isLeaf = currentCategoryId != null && currentChildren.length === 0;
+
+  // Search overrides drill-down (search across everything in current scope or all)
+  const isSearching = searchQuery.trim().length > 0;
+
+  const scopeIds = useMemo(() => {
+    if (currentCategoryId == null) return null;
+    return collectDescendants(currentCategoryId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentCategoryId, childrenOf]);
 
   const filteredVideos = useMemo(() => {
     return videos.filter((video) => {
-      if (searchQuery) {
+      if (isSearching) {
         const q = searchQuery.toLowerCase();
         if (
           !video.title.toLowerCase().includes(q) &&
@@ -122,31 +131,22 @@ export default function Videos() {
         ) {
           return false;
         }
+      } else if (!isLeaf) {
+        // Hide videos when not at a leaf and not searching
+        return false;
       }
 
-      if (descendantIds) {
-        if (!video.category_id_new || !descendantIds.has(video.category_id_new as number)) {
+      if (scopeIds) {
+        if (
+          !video.category_id_new ||
+          !scopeIds.has(video.category_id_new as number)
+        ) {
           return false;
         }
       }
-
-      if (subFilter !== "all") {
-        const subId = Number(subFilter);
-        // Match if video is in this subcategory or any of its descendants
-        const subTree = new Set<number>();
-        const walk = (id: number) => {
-          subTree.add(id);
-          (childrenOf.get(id) || []).forEach((c) => walk(c.id));
-        };
-        walk(subId);
-        if (!video.category_id_new || !subTree.has(video.category_id_new as number)) {
-          return false;
-        }
-      }
-
       return true;
     });
-  }, [videos, searchQuery, descendantIds, subFilter, childrenOf]);
+  }, [videos, searchQuery, isSearching, isLeaf, scopeIds]);
 
   const updateUrl = (path: number[], q: string) => {
     const params: Record<string, string> = {};
@@ -157,27 +157,39 @@ export default function Videos() {
 
   const navigateToPath = (path: number[]) => {
     setCategoryPath(path);
-    setSubFilter("all");
     updateUrl(path, searchQuery);
   };
 
-  const drillInto = (catId: number) => navigateToPath([...categoryPath, catId]);
+  const drillInto = (catId: number) =>
+    navigateToPath([...categoryPath, catId]);
   const goHome = () => navigateToPath([]);
 
   const clearFilters = () => {
     setSearchQuery("");
-    setSubFilter("all");
     navigateToPath([]);
   };
 
-  const hasActiveFilters = searchQuery || categoryPath.length > 0 || subFilter !== "all";
+  const hasActiveFilters = searchQuery || categoryPath.length > 0;
 
-  // Breadcrumb crumbs
   const crumbs = categoryPath
     .map((id) => categoriesById.get(id))
     .filter(Boolean) as Category[];
 
-  const showingCategoryGrid = categoryPath.length === 0 && !searchQuery;
+  // Image for a category — use mapped image for top-level slugs, otherwise
+  // walk up the tree to find an ancestor with one.
+  const imageForCategory = (cat: Category): string | null => {
+    let cur: Category | undefined = cat;
+    while (cur) {
+      const img = CATEGORY_IMAGE_BY_SLUG[cur.slug];
+      if (img) return img;
+      if (cur.parent_id == null) break;
+      cur = categoriesById.get(cur.parent_id);
+    }
+    return null;
+  };
+
+  // What to render in the main area
+  const showCategoryGrid = !isSearching && !isLeaf;
 
   return (
     <Layout>
@@ -185,14 +197,16 @@ export default function Videos() {
         <div className="container-wide">
           {/* Header */}
           <div className="mb-6">
-            <h1 className="font-heading text-3xl font-bold md:text-4xl">Video Library</h1>
+            <h1 className="font-heading text-3xl font-bold md:text-4xl">
+              Video Library
+            </h1>
             <p className="mt-2 text-muted-foreground">
               Browse our complete collection of CTE training videos
             </p>
           </div>
 
-          {/* Search and Filters */}
-          <div className="mb-6 space-y-4">
+          {/* Search */}
+          <div className="mb-6">
             <div className="relative max-w-xl">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
@@ -209,7 +223,7 @@ export default function Videos() {
           </div>
 
           {/* Breadcrumbs */}
-          <div className="mb-8 rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 shadow-sm">
+          <div className="mb-8 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 shadow-sm">
             <Breadcrumb>
               <BreadcrumbList className="text-base">
                 <BreadcrumbItem>
@@ -238,7 +252,9 @@ export default function Videos() {
                           </BreadcrumbPage>
                         ) : (
                           <BreadcrumbLink
-                            onClick={() => navigateToPath(categoryPath.slice(0, idx + 1))}
+                            onClick={() =>
+                              navigateToPath(categoryPath.slice(0, idx + 1))
+                            }
                             className="cursor-pointer font-medium text-primary hover:text-primary/80"
                           >
                             {c.name}
@@ -250,121 +266,94 @@ export default function Videos() {
                 })}
               </BreadcrumbList>
             </Breadcrumb>
-          </div>
 
-          {/* Filters */}
-          <div className="mb-8 space-y-4">
-
-            {/* Subcategory filter only inside a category */}
-            {categoryPath.length > 0 && currentChildren.length > 0 && (
-              <div className="flex flex-wrap items-center gap-3">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Filter className="h-4 w-4" />
-                  <span>Filter:</span>
-                </div>
-                <Select value={subFilter} onValueChange={setSubFilter}>
-                  <SelectTrigger className="w-[240px]">
-                    <SelectValue placeholder="Subcategory" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All subcategories</SelectItem>
-                    {currentChildren.map((c) => (
-                      <SelectItem key={c.id} value={String(c.id)}>
-                        {c.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {hasActiveFilters && (
-                  <Button variant="ghost" size="sm" onClick={clearFilters} className="gap-1">
-                    <X className="h-4 w-4" />
-                    Clear
-                  </Button>
-                )}
-              </div>
-            )}
-
-            {hasActiveFilters && categoryPath.length === 0 && (
-              <Button variant="ghost" size="sm" onClick={clearFilters} className="gap-1">
+            {hasActiveFilters && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={clearFilters}
+                className="gap-1"
+              >
                 <X className="h-4 w-4" />
                 Clear
               </Button>
             )}
           </div>
 
-          {/* Top-level category grid (default landing) */}
-          {showingCategoryGrid ? (
-            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {topLevel.map((cat) => {
-                const count = countVideosUnder(cat.id);
-                const subCount = (childrenOf.get(cat.id) || []).length;
-                return (
-                  <button
-                    key={cat.id}
-                    onClick={() => drillInto(cat.id)}
-                    className={cn(
-                      "group text-left rounded-2xl border bg-card p-6 shadow-sm transition-all",
-                      "hover:shadow-md hover:border-primary/40 hover:-translate-y-0.5"
-                    )}
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="rounded-xl bg-primary/10 p-3 text-primary">
-                        <FolderOpen className="h-6 w-6" />
-                      </div>
-                      <ChevronRight className="h-5 w-5 text-muted-foreground transition-transform group-hover:translate-x-1" />
-                    </div>
-                    <h3 className="mt-4 font-heading text-lg font-semibold">{cat.name}</h3>
-                    {cat.description && (
-                      <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
-                        {cat.description}
-                      </p>
-                    )}
-                    <div className="mt-4 flex items-center gap-3 text-xs text-muted-foreground">
-                      <span>{count} {count === 1 ? "video" : "videos"}</span>
-                      {subCount > 0 && (
-                        <>
-                          <span>•</span>
-                          <span>{subCount} {subCount === 1 ? "subcategory" : "subcategories"}</span>
-                        </>
-                      )}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          ) : (
+          {/* Main content */}
+          {showCategoryGrid ? (
             <>
-              {/* Subcategory chips when drilled in */}
-              {categoryPath.length > 0 && currentChildren.length > 0 && subFilter === "all" && !searchQuery && (
-                <div className="mb-8">
-                  <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                    Subcategories
-                  </h2>
-                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                    {currentChildren.map((c) => {
-                      const count = countVideosUnder(c.id);
-                      return (
-                        <button
-                          key={c.id}
-                          onClick={() => drillInto(c.id)}
-                          className="group flex items-center justify-between rounded-xl border bg-card p-4 text-left shadow-sm transition-all hover:border-primary/40 hover:shadow-md"
-                        >
-                          <div>
-                            <div className="font-medium">{c.name}</div>
-                            <div className="text-xs text-muted-foreground">
-                              {count} {count === 1 ? "video" : "videos"}
-                            </div>
+              <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                {currentChildren.map((cat) => {
+                  const count = countVideosUnder(cat.id);
+                  const subCount = (childrenOf.get(cat.id) || []).length;
+                  const img = imageForCategory(cat);
+                  return (
+                    <button
+                      key={cat.id}
+                      onClick={() => drillInto(cat.id)}
+                      className={cn(
+                        "group flex flex-col overflow-hidden rounded-2xl border bg-card text-left shadow-sm transition-all",
+                        "hover:shadow-lg hover:border-primary/40 hover:-translate-y-0.5"
+                      )}
+                    >
+                      <div className="relative aspect-[4/3] w-full overflow-hidden bg-muted">
+                        {img ? (
+                          <img
+                            src={img}
+                            alt={cat.name}
+                            loading="lazy"
+                            width={800}
+                            height={600}
+                            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                          />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center bg-primary/10">
+                            <FolderOpen className="h-12 w-12 text-primary" />
                           </div>
-                          <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-1" />
-                        </button>
-                      );
-                    })}
-                  </div>
+                        )}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
+                        <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between">
+                          <span className="rounded-full bg-background/90 px-3 py-1 text-xs font-semibold text-foreground backdrop-blur">
+                            {count} {count === 1 ? "video" : "videos"}
+                          </span>
+                          <ChevronRight className="h-5 w-5 text-white drop-shadow transition-transform group-hover:translate-x-1" />
+                        </div>
+                      </div>
+                      <div className="flex-1 p-5">
+                        <h3 className="font-heading text-lg font-semibold">
+                          {cat.name}
+                        </h3>
+                        {cat.description && (
+                          <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
+                            {cat.description}
+                          </p>
+                        )}
+                        {subCount > 0 && (
+                          <p className="mt-3 text-xs text-muted-foreground">
+                            {subCount}{" "}
+                            {subCount === 1 ? "subcategory" : "subcategories"}
+                          </p>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+              {currentChildren.length === 0 && (
+                <div className="py-16 text-center">
+                  <p className="text-lg text-muted-foreground">
+                    No subcategories found.
+                  </p>
                 </div>
               )}
-
+            </>
+          ) : (
+            <>
               <div className="mb-4 text-sm text-muted-foreground">
-                Showing {filteredVideos.length} {filteredVideos.length === 1 ? "video" : "videos"}
+                {isSearching
+                  ? `Found ${filteredVideos.length} ${filteredVideos.length === 1 ? "video" : "videos"} matching "${searchQuery}"`
+                  : `Showing ${filteredVideos.length} ${filteredVideos.length === 1 ? "video" : "videos"}`}
               </div>
 
               {videosLoading ? (
@@ -374,7 +363,9 @@ export default function Videos() {
               ) : filteredVideos.length > 0 ? (
                 <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                   {filteredVideos.map((video, index) => {
-                    const category = categoriesById.get(video.category_id_new as number);
+                    const category = categoriesById.get(
+                      video.category_id_new as number
+                    );
                     return (
                       <VideoCard
                         key={video.id}
@@ -390,7 +381,11 @@ export default function Videos() {
                   <p className="text-lg text-muted-foreground">
                     No videos found matching your criteria.
                   </p>
-                  <Button variant="link" onClick={clearFilters} className="mt-2">
+                  <Button
+                    variant="link"
+                    onClick={clearFilters}
+                    className="mt-2"
+                  >
                     Clear all filters
                   </Button>
                 </div>
