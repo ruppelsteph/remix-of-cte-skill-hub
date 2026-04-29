@@ -41,6 +41,16 @@ interface CategoryNode extends Category {
   depth: number;
 }
 
+interface VideoLite {
+  id: string;
+  title: string;
+  slug: string | null;
+  is_active: boolean | null;
+  is_free: boolean | null;
+  duration: string | null;
+  category_id_new: number | null;
+}
+
 const slugify = (s: string) =>
   s
     .toLowerCase()
@@ -52,10 +62,12 @@ const slugify = (s: string) =>
 export function AdminCategories() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [videoCounts, setVideoCounts] = useState<Map<number, number>>(new Map());
+  const [allVideos, setAllVideos] = useState<VideoLite[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Category | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [videosCategory, setVideosCategory] = useState<CategoryNode | null>(null);
   const { toast } = useToast();
 
   const [formData, setFormData] = useState({
@@ -71,7 +83,9 @@ export function AdminCategories() {
     try {
       const [catRes, vidRes] = await Promise.all([
         supabase.from("categories").select("*").order("name"),
-        supabase.from("videos").select("category_id_new").not("category_id_new", "is", null),
+        supabase
+          .from("videos")
+          .select("id, title, slug, is_active, is_free, duration, category_id_new"),
       ]);
       if (catRes.error) throw catRes.error;
       if (vidRes.error) throw vidRes.error;
@@ -85,6 +99,7 @@ export function AdminCategories() {
 
       setCategories(catRes.data || []);
       setVideoCounts(counts);
+      setAllVideos((vidRes.data || []) as VideoLite[]);
     } catch (err) {
       console.error("Error fetching categories:", err);
       toast({ variant: "destructive", title: "Error", description: "Failed to load categories." });
@@ -384,7 +399,14 @@ export function AdminCategories() {
                   )}
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-medium truncate">{c.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => setVideosCategory(c)}
+                        className="font-medium truncate text-left hover:text-primary hover:underline focus:outline-none focus:text-primary"
+                        title="View videos in this category"
+                      >
+                        {c.name}
+                      </button>
                       {!c.is_active && <Badge variant="secondary">Inactive</Badge>}
                       <Badge variant="outline" className="text-xs">
                         {c.videoCount} video{c.videoCount === 1 ? "" : "s"}
@@ -422,6 +444,59 @@ export function AdminCategories() {
           </div>
         )}
       </CardContent>
+
+      {/* Videos in category dialog */}
+      <Dialog open={!!videosCategory} onOpenChange={(open) => !open && setVideosCategory(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>
+              Videos in “{videosCategory?.name}”
+            </DialogTitle>
+            <DialogDescription>
+              {videosCategory
+                ? `${allVideos.filter((v) => v.category_id_new === videosCategory.id).length} video(s) directly assigned to this category.`
+                : ""}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[60vh] overflow-y-auto space-y-2">
+            {videosCategory &&
+              (() => {
+                const list = allVideos.filter((v) => v.category_id_new === videosCategory.id);
+                if (list.length === 0) {
+                  return (
+                    <p className="text-sm text-muted-foreground text-center py-8">
+                      No videos assigned to this category yet.
+                    </p>
+                  );
+                }
+                return list.map((v) => (
+                  <div
+                    key={v.id}
+                    className="flex items-center justify-between rounded-md border bg-card px-3 py-2"
+                  >
+                    <div className="min-w-0">
+                      <p className="font-medium truncate">{v.title}</p>
+                      <div className="flex items-center gap-2 mt-1 flex-wrap">
+                        {v.duration && (
+                          <span className="text-xs text-muted-foreground">{v.duration}</span>
+                        )}
+                        {v.is_free && <Badge variant="outline" className="text-xs">Free</Badge>}
+                        {v.is_active === false && (
+                          <Badge variant="secondary" className="text-xs">Inactive</Badge>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ));
+              })()}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setVideosCategory(null)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
