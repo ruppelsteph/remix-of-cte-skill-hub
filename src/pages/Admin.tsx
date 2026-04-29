@@ -6,7 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2, Users, Video, FolderOpen, CreditCard, UserCog, Repeat } from "lucide-react";
 import { AdminCustomers } from "@/components/admin/AdminCustomers";
 import { AdminVideos } from "@/components/admin/AdminVideos";
-import { AdminPathways } from "@/components/admin/AdminPathways";
+import { AdminCategories } from "@/components/admin/AdminCategories";
 import { AdminOrders } from "@/components/admin/AdminOrders";
 import { AdminUsers } from "@/components/admin/AdminUsers";
 import { AdminSubscriptions } from "@/components/admin/AdminSubscriptions";
