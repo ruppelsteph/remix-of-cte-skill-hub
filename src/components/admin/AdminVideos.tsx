@@ -426,14 +426,52 @@ export function AdminVideos() {
                     rows={3}
                   />
                 </div>
-                <div>
-                  <Label htmlFor="video_url">Video URL</Label>
-                  <Input
-                    id="video_url"
-                    value={formData.video_url}
-                    onChange={(e) => setFormData({ ...formData, video_url: e.target.value })}
-                    placeholder="https://..."
-                  />
+                <div className="space-y-2">
+                  <Label>Video Source</Label>
+                  <div className="grid grid-cols-[140px_1fr] gap-2">
+                    <Select
+                      value={formData.video_provider}
+                      onValueChange={(value: "youtube" | "vimeo" | "other") => {
+                        setFormData({ ...formData, video_provider: value });
+                        setVideoInputError(null);
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="youtube">YouTube</SelectItem>
+                        <SelectItem value="vimeo">Vimeo</SelectItem>
+                        <SelectItem value="other">Other (full URL)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Input
+                      id="video_input"
+                      value={formData.video_input}
+                      onChange={(e) => {
+                        setFormData({ ...formData, video_input: e.target.value });
+                        if (videoInputError) setVideoInputError(null);
+                      }}
+                      placeholder={
+                        formData.video_provider === "youtube"
+                          ? "Video ID (e.g. dQw4w9WgXcQ) or full URL"
+                          : formData.video_provider === "vimeo"
+                          ? "Numeric ID (e.g. 123456789) or full URL"
+                          : "https://..."
+                      }
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {formData.video_provider === "youtube" &&
+                      "Paste just the YouTube video ID or any full YouTube URL (watch, youtu.be, embed, shorts)."}
+                    {formData.video_provider === "vimeo" &&
+                      "Paste just the numeric Vimeo ID or a full vimeo.com URL."}
+                    {formData.video_provider === "other" &&
+                      "Paste a full embeddable URL starting with http:// or https://."}
+                  </p>
+                  {videoInputError && (
+                    <p className="text-xs text-destructive">{videoInputError}</p>
+                  )}
                 </div>
                 <div>
                   <Label htmlFor="thumbnail_url">Thumbnail URL</Label>
