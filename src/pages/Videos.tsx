@@ -20,6 +20,22 @@ import { cn } from "@/lib/utils";
 import industrialImg from "@/assets/category-industrial.jpg";
 import buildingsImg from "@/assets/category-buildings-trades.jpg";
 import cosmetologyImg from "@/assets/category-cosmetology.jpg";
+import cosmetologyStateBoardImg from "@/assets/category-cosmetology-state-board.jpg";
+import analyzersImg from "@/assets/category-analyzers.jpg";
+import electricalImg from "@/assets/category-electrical.jpg";
+import instrumentationImg from "@/assets/category-instrumentation.jpg";
+import mechanicalImg from "@/assets/category-mechanical.jpg";
+import processTechnologyImg from "@/assets/category-process-technology.jpg";
+import basicInstrumentationImg from "@/assets/category-basic-instrumentation.jpg";
+import calibrationImg from "@/assets/category-calibration.jpg";
+import maintenanceImg from "@/assets/category-maintenance.jpg";
+import tubeBendingImg from "@/assets/category-tube-bending.jpg";
+import compressorsImg from "@/assets/category-compressors.jpg";
+import coolingTowersImg from "@/assets/category-cooling-towers.jpg";
+import distillationImg from "@/assets/category-distillation.jpg";
+import processEquipmentImg from "@/assets/category-process-equipment.jpg";
+import pumpsImg from "@/assets/category-pumps.jpg";
+import valvesImg from "@/assets/category-valves.jpg";
 
 type Category = {
   id: number;
@@ -31,9 +47,30 @@ type Category = {
 };
 
 const CATEGORY_IMAGE_BY_SLUG: Record<string, string> = {
+  // Top-level
   industrial: industrialImg,
   "buildings-trades": buildingsImg,
   cosmetology: cosmetologyImg,
+  // Cosmetology subcategories
+  "cosmetology-state-board": cosmetologyStateBoardImg,
+  // Industrial subcategories
+  analyzers: analyzersImg,
+  electrical: electricalImg,
+  instrumentation: instrumentationImg,
+  mechanical: mechanicalImg,
+  "process-technology": processTechnologyImg,
+  // Instrumentation subcategories
+  "basic-instrumentation": basicInstrumentationImg,
+  calibration: calibrationImg,
+  maintenance: maintenanceImg,
+  "tube-bending": tubeBendingImg,
+  // Process Technology subcategories
+  compressors: compressorsImg,
+  "cooling-towers": coolingTowersImg,
+  distillation: distillationImg,
+  "process-equipment": processEquipmentImg,
+  pumps: pumpsImg,
+  valves: valvesImg,
 };
 
 export default function Videos() {
