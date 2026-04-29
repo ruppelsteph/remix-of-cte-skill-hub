@@ -1,0 +1,1 @@
+UPDATE public.videos SET thumbnail_url = '/thumbnails/hst-ap-mapping-the-body.png' WHERE slug = 'mapping-the-body';
