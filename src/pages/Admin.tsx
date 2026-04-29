@@ -6,7 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2, Users, Video, FolderOpen, CreditCard, UserCog, Repeat } from "lucide-react";
 import { AdminCustomers } from "@/components/admin/AdminCustomers";
 import { AdminVideos } from "@/components/admin/AdminVideos";
-import { AdminPathways } from "@/components/admin/AdminPathways";
+import { AdminCategories } from "@/components/admin/AdminCategories";
 import { AdminOrders } from "@/components/admin/AdminOrders";
 import { AdminUsers } from "@/components/admin/AdminUsers";
 import { AdminSubscriptions } from "@/components/admin/AdminSubscriptions";
@@ -45,7 +45,7 @@ const Admin = () => {
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-foreground mb-2">Admin Portal</h1>
             <p className="text-muted-foreground">
-              Manage customers, videos, pathways, and orders.
+              Manage customers, videos, categories, and orders.
             </p>
           </div>
 
@@ -71,9 +71,9 @@ const Admin = () => {
                 <Video className="h-4 w-4" />
                 <span className="hidden sm:inline">Videos</span>
               </TabsTrigger>
-              <TabsTrigger value="pathways" className="flex items-center gap-2">
+              <TabsTrigger value="categories" className="flex items-center gap-2">
                 <FolderOpen className="h-4 w-4" />
-                <span className="hidden sm:inline">Pathways</span>
+                <span className="hidden sm:inline">Categories</span>
               </TabsTrigger>
             </TabsList>
 
@@ -97,8 +97,8 @@ const Admin = () => {
               <AdminVideos />
             </TabsContent>
 
-            <TabsContent value="pathways">
-              <AdminPathways />
+            <TabsContent value="categories">
+              <AdminCategories />
             </TabsContent>
           </Tabs>
         </div>
