@@ -59,6 +59,18 @@ const slugify = (s: string) =>
     .replace(/\s+/g, "-")
     .replace(/-+/g, "-");
 
+const stripHtml = (s: string) =>
+  s
+    .replace(/<[^>]*>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\s+/g, " ")
+    .trim();
+
 export function AdminCategories() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [videoCounts, setVideoCounts] = useState<Map<number, number>>(new Map());
