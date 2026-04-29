@@ -39,7 +39,8 @@ interface VideoData {
   title: string;
   description: string | null;
   thumbnail_url: string | null;
-  video_url: string | null; // populated from video_sources, not videos
+  vimeo_url: string | null; // full source from video_sources (kind='vimeo')
+  youtube_url: string | null; // preview source from video_sources (kind='youtube')
   duration: string | null;
   category_id_new: number | null;
   skill_level?: string;
