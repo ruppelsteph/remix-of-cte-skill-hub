@@ -97,8 +97,8 @@ const Admin = () => {
               <AdminVideos />
             </TabsContent>
 
-            <TabsContent value="pathways">
-              <AdminPathways />
+            <TabsContent value="categories">
+              <AdminCategories />
             </TabsContent>
           </Tabs>
         </div>
