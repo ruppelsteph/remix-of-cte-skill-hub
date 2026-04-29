@@ -72,15 +72,16 @@ export function AdminVideos() {
     title: "",
     description: "",
     thumbnail_url: "",
-    video_provider: "youtube" as "youtube" | "vimeo" | "other",
-    video_input: "",
+    vimeo_input: "",
+    youtube_input: "",
     duration: "",
     category_id_new: "" as string,
     skill_level: "beginner",
     is_free: false,
     is_active: true,
   });
-  const [videoInputError, setVideoInputError] = useState<string | null>(null);
+  const [vimeoInputError, setVimeoInputError] = useState<string | null>(null);
+  const [youtubeInputError, setYoutubeInputError] = useState<string | null>(null);
 
   const fetchData = async () => {
     setIsLoading(true);
