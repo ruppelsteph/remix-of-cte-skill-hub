@@ -41,6 +41,16 @@ interface CategoryNode extends Category {
   depth: number;
 }
 
+interface VideoLite {
+  id: string;
+  title: string;
+  slug: string | null;
+  is_active: boolean | null;
+  is_free: boolean | null;
+  duration: string | null;
+  category_id_new: number | null;
+}
+
 const slugify = (s: string) =>
   s
     .toLowerCase()
