@@ -83,7 +83,9 @@ export function AdminCategories() {
     try {
       const [catRes, vidRes] = await Promise.all([
         supabase.from("categories").select("*").order("name"),
-        supabase.from("videos").select("category_id_new").not("category_id_new", "is", null),
+        supabase
+          .from("videos")
+          .select("id, title, slug, is_active, is_free, duration, category_id_new"),
       ]);
       if (catRes.error) throw catRes.error;
       if (vidRes.error) throw vidRes.error;
@@ -97,6 +99,7 @@ export function AdminCategories() {
 
       setCategories(catRes.data || []);
       setVideoCounts(counts);
+      setAllVideos((vidRes.data || []) as VideoLite[]);
     } catch (err) {
       console.error("Error fetching categories:", err);
       toast({ variant: "destructive", title: "Error", description: "Failed to load categories." });
