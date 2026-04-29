@@ -494,8 +494,8 @@ function CategoryRow({ node, onView, onAddChild, onEdit, onDelete }: CategoryRow
                 </Badge>
               )}
             </div>
-            {node.description && (
-              <p className="text-xs text-muted-foreground truncate">{node.description}</p>
+            {node.description && stripHtml(node.description) && (
+              <p className="text-xs text-muted-foreground truncate">{stripHtml(node.description)}</p>
             )}
           </div>
         </div>
