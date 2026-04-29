@@ -399,7 +399,14 @@ export function AdminCategories() {
                   )}
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-medium truncate">{c.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => setVideosCategory(c)}
+                        className="font-medium truncate text-left hover:text-primary hover:underline focus:outline-none focus:text-primary"
+                        title="View videos in this category"
+                      >
+                        {c.name}
+                      </button>
                       {!c.is_active && <Badge variant="secondary">Inactive</Badge>}
                       <Badge variant="outline" className="text-xs">
                         {c.videoCount} video{c.videoCount === 1 ? "" : "s"}
