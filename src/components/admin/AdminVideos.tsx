@@ -39,7 +39,8 @@ interface VideoData {
   title: string;
   description: string | null;
   thumbnail_url: string | null;
-  video_url: string | null; // populated from video_sources, not videos
+  vimeo_url: string | null; // full source from video_sources (kind='vimeo')
+  youtube_url: string | null; // preview source from video_sources (kind='youtube')
   duration: string | null;
   category_id_new: number | null;
   skill_level?: string;
@@ -71,15 +72,16 @@ export function AdminVideos() {
     title: "",
     description: "",
     thumbnail_url: "",
-    video_provider: "youtube" as "youtube" | "vimeo" | "other",
-    video_input: "",
+    vimeo_input: "",
+    youtube_input: "",
     duration: "",
     category_id_new: "" as string,
     skill_level: "beginner",
     is_free: false,
     is_active: true,
   });
-  const [videoInputError, setVideoInputError] = useState<string | null>(null);
+  const [vimeoInputError, setVimeoInputError] = useState<string | null>(null);
+  const [youtubeInputError, setYoutubeInputError] = useState<string | null>(null);
 
   const fetchData = async () => {
     setIsLoading(true);
@@ -87,20 +89,24 @@ export function AdminVideos() {
       const [videosRes, categoriesRes, sourcesRes] = await Promise.all([
         supabase.from("videos").select("*").order("created_at", { ascending: false }),
         supabase.from("categories").select("id, name").order("name"),
-        supabase.from("video_sources").select("video_id, video_url"),
+        supabase.from("video_sources").select("video_id, video_url, kind"),
       ]);
 
       if (videosRes.error) throw videosRes.error;
       if (categoriesRes.error) throw categoriesRes.error;
       if (sourcesRes.error) throw sourcesRes.error;
 
-      const urlByVideo = new Map<string, string>(
-        (sourcesRes.data || []).map((s) => [s.video_id, s.video_url])
-      );
+      const vimeoByVideo = new Map<string, string>();
+      const youtubeByVideo = new Map<string, string>();
+      for (const s of sourcesRes.data || []) {
+        if (s.kind === "vimeo") vimeoByVideo.set(s.video_id, s.video_url);
+        else if (s.kind === "youtube") youtubeByVideo.set(s.video_id, s.video_url);
+      }
 
       const merged: VideoData[] = (videosRes.data || []).map((v) => ({
         ...v,
-        video_url: urlByVideo.get(v.id) ?? null,
+        vimeo_url: vimeoByVideo.get(v.id) ?? null,
+        youtube_url: youtubeByVideo.get(v.id) ?? null,
       }));
 
       setVideos(merged);
@@ -122,72 +128,52 @@ export function AdminVideos() {
   }, []);
 
 
-  // -------- Provider / URL helpers --------
-  type Provider = "youtube" | "vimeo" | "other";
+  // -------- URL helpers --------
 
-  const detectProvider = (url: string | null | undefined): Provider => {
-    if (!url) return "youtube";
-    if (/youtube\.com|youtu\.be/i.test(url)) return "youtube";
-    if (/vimeo\.com/i.test(url)) return "vimeo";
-    return "other";
-  };
-
-  const extractIdForEdit = (url: string | null | undefined, provider: Provider): string => {
+  const extractYoutubeId = (url: string | null | undefined): string => {
     if (!url) return "";
-    if (provider === "youtube") {
-      const m =
-        url.match(/[?&]v=([A-Za-z0-9_-]{11})/) ||
-        url.match(/youtu\.be\/([A-Za-z0-9_-]{11})/) ||
-        url.match(/youtube\.com\/embed\/([A-Za-z0-9_-]{11})/) ||
-        url.match(/youtube\.com\/shorts\/([A-Za-z0-9_-]{11})/);
-      return m ? m[1] : url;
-    }
-    if (provider === "vimeo") {
-      const m =
-        url.match(/player\.vimeo\.com\/video\/(\d+)/) ||
-        url.match(/vimeo\.com\/(\d+)/);
-      return m ? m[1] : url;
-    }
-    return url;
+    const m =
+      url.match(/[?&]v=([A-Za-z0-9_-]{11})/) ||
+      url.match(/youtu\.be\/([A-Za-z0-9_-]{11})/) ||
+      url.match(/youtube\.com\/embed\/([A-Za-z0-9_-]{11})/) ||
+      url.match(/youtube\.com\/shorts\/([A-Za-z0-9_-]{11})/);
+    return m ? m[1] : url;
   };
 
-  const normalizeToCanonicalUrl = (
-    input: string,
-    provider: Provider
-  ): { url: string | null; error: string | null } => {
+  const extractVimeoId = (url: string | null | undefined): string => {
+    if (!url) return "";
+    const m =
+      url.match(/player\.vimeo\.com\/video\/(\d+)/) ||
+      url.match(/vimeo\.com\/(\d+)/);
+    return m ? m[1] : url;
+  };
+
+  const normalizeYoutube = (input: string): { url: string | null; error: string | null } => {
     const trimmed = input.trim();
     if (!trimmed) return { url: null, error: null };
-
-    if (provider === "youtube") {
-      // Bare 11-char ID
-      if (/^[A-Za-z0-9_-]{11}$/.test(trimmed)) {
-        return { url: `https://www.youtube.com/watch?v=${trimmed}`, error: null };
-      }
-      const m =
-        trimmed.match(/[?&]v=([A-Za-z0-9_-]{11})/) ||
-        trimmed.match(/youtu\.be\/([A-Za-z0-9_-]{11})/) ||
-        trimmed.match(/youtube\.com\/embed\/([A-Za-z0-9_-]{11})/) ||
-        trimmed.match(/youtube\.com\/shorts\/([A-Za-z0-9_-]{11})/);
-      if (m) return { url: `https://www.youtube.com/watch?v=${m[1]}`, error: null };
-      return { url: null, error: "Couldn't recognize that as a YouTube ID or URL" };
+    if (/^[A-Za-z0-9_-]{11}$/.test(trimmed)) {
+      return { url: `https://www.youtube.com/watch?v=${trimmed}`, error: null };
     }
+    const m =
+      trimmed.match(/[?&]v=([A-Za-z0-9_-]{11})/) ||
+      trimmed.match(/youtu\.be\/([A-Za-z0-9_-]{11})/) ||
+      trimmed.match(/youtube\.com\/embed\/([A-Za-z0-9_-]{11})/) ||
+      trimmed.match(/youtube\.com\/shorts\/([A-Za-z0-9_-]{11})/);
+    if (m) return { url: `https://www.youtube.com/watch?v=${m[1]}`, error: null };
+    return { url: null, error: "Couldn't recognize that as a YouTube ID or URL" };
+  };
 
-    if (provider === "vimeo") {
-      if (/^\d+$/.test(trimmed)) {
-        return { url: `https://vimeo.com/${trimmed}`, error: null };
-      }
-      const m =
-        trimmed.match(/player\.vimeo\.com\/video\/(\d+)/) ||
-        trimmed.match(/vimeo\.com\/(\d+)/);
-      if (m) return { url: `https://vimeo.com/${m[1]}`, error: null };
-      return { url: null, error: "Couldn't recognize that as a Vimeo ID or URL" };
+  const normalizeVimeo = (input: string): { url: string | null; error: string | null } => {
+    const trimmed = input.trim();
+    if (!trimmed) return { url: null, error: null };
+    if (/^\d+$/.test(trimmed)) {
+      return { url: `https://vimeo.com/${trimmed}`, error: null };
     }
-
-    // Other
-    if (!/^https?:\/\//i.test(trimmed)) {
-      return { url: null, error: "Must be a full URL starting with http:// or https://" };
-    }
-    return { url: trimmed, error: null };
+    const m =
+      trimmed.match(/player\.vimeo\.com\/video\/(\d+)/) ||
+      trimmed.match(/vimeo\.com\/(\d+)/);
+    if (m) return { url: `https://vimeo.com/${m[1]}`, error: null };
+    return { url: null, error: "Couldn't recognize that as a Vimeo ID or URL" };
   };
 
   const resetForm = () => {
@@ -195,34 +181,35 @@ export function AdminVideos() {
       title: "",
       description: "",
       thumbnail_url: "",
-      video_provider: "youtube",
-      video_input: "",
+      vimeo_input: "",
+      youtube_input: "",
       duration: "",
       category_id_new: "",
       skill_level: "beginner",
       is_free: false,
       is_active: true,
     });
-    setVideoInputError(null);
+    setVimeoInputError(null);
+    setYoutubeInputError(null);
     setEditingVideo(null);
   };
 
   const handleEdit = (video: VideoData) => {
-    const provider = detectProvider(video.video_url);
     setEditingVideo(video);
     setFormData({
       title: video.title,
       description: video.description || "",
       thumbnail_url: video.thumbnail_url || "",
-      video_provider: provider,
-      video_input: extractIdForEdit(video.video_url, provider),
+      vimeo_input: extractVimeoId(video.vimeo_url),
+      youtube_input: extractYoutubeId(video.youtube_url),
       duration: video.duration || "",
       category_id_new: video.category_id_new ? String(video.category_id_new) : "",
       skill_level: video.skill_level || "beginner",
       is_free: video.is_free,
       is_active: video.is_active,
     });
-    setVideoInputError(null);
+    setVimeoInputError(null);
+    setYoutubeInputError(null);
     setIsDialogOpen(true);
   };
 
@@ -242,16 +229,18 @@ export function AdminVideos() {
         is_active: formData.is_active,
       };
 
-      const { url: canonicalUrl, error: urlError } = normalizeToCanonicalUrl(
-        formData.video_input,
-        formData.video_provider
-      );
-      if (urlError) {
-        setVideoInputError(urlError);
+      const vimeoNorm = normalizeVimeo(formData.vimeo_input);
+      const youtubeNorm = normalizeYoutube(formData.youtube_input);
+      if (vimeoNorm.error) {
+        setVimeoInputError(vimeoNorm.error);
         setIsSaving(false);
         return;
       }
-      const trimmedUrl = canonicalUrl ?? "";
+      if (youtubeNorm.error) {
+        setYoutubeInputError(youtubeNorm.error);
+        setIsSaving(false);
+        return;
+      }
       let videoId: string;
 
       if (editingVideo) {
@@ -273,21 +262,39 @@ export function AdminVideos() {
         toast({ title: "Video created successfully" });
       }
 
-      // Sync video_sources (separate, access-controlled table)
-      if (trimmedUrl) {
+      // Sync Vimeo (full) source
+      if (vimeoNorm.url) {
         const { error: srcError } = await supabase
           .from("video_sources")
           .upsert(
-            { video_id: videoId, video_url: trimmedUrl },
-            { onConflict: "video_id" }
+            { video_id: videoId, video_url: vimeoNorm.url, kind: "vimeo", is_preview: false },
+            { onConflict: "video_id,kind" }
           );
         if (srcError) throw srcError;
       } else {
-        // No URL provided — remove any existing source row
         const { error: delError } = await supabase
           .from("video_sources")
           .delete()
-          .eq("video_id", videoId);
+          .eq("video_id", videoId)
+          .eq("kind", "vimeo");
+        if (delError) throw delError;
+      }
+
+      // Sync YouTube (preview) source
+      if (youtubeNorm.url) {
+        const { error: srcError } = await supabase
+          .from("video_sources")
+          .upsert(
+            { video_id: videoId, video_url: youtubeNorm.url, kind: "youtube", is_preview: true },
+            { onConflict: "video_id,kind" }
+          );
+        if (srcError) throw srcError;
+      } else {
+        const { error: delError } = await supabase
+          .from("video_sources")
+          .delete()
+          .eq("video_id", videoId)
+          .eq("kind", "youtube");
         if (delError) throw delError;
       }
 
@@ -427,50 +434,39 @@ export function AdminVideos() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Video Source</Label>
-                  <div className="grid grid-cols-[140px_1fr] gap-2">
-                    <Select
-                      value={formData.video_provider}
-                      onValueChange={(value: "youtube" | "vimeo" | "other") => {
-                        setFormData({ ...formData, video_provider: value });
-                        setVideoInputError(null);
-                      }}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="youtube">YouTube</SelectItem>
-                        <SelectItem value="vimeo">Vimeo</SelectItem>
-                        <SelectItem value="other">Other (full URL)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <Input
-                      id="video_input"
-                      value={formData.video_input}
-                      onChange={(e) => {
-                        setFormData({ ...formData, video_input: e.target.value });
-                        if (videoInputError) setVideoInputError(null);
-                      }}
-                      placeholder={
-                        formData.video_provider === "youtube"
-                          ? "Video ID (e.g. dQw4w9WgXcQ) or full URL"
-                          : formData.video_provider === "vimeo"
-                          ? "Numeric ID (e.g. 123456789) or full URL"
-                          : "https://..."
-                      }
-                    />
-                  </div>
+                  <Label htmlFor="vimeo_input">Vimeo Video (full)</Label>
+                  <Input
+                    id="vimeo_input"
+                    value={formData.vimeo_input}
+                    onChange={(e) => {
+                      setFormData({ ...formData, vimeo_input: e.target.value });
+                      if (vimeoInputError) setVimeoInputError(null);
+                    }}
+                    placeholder="Numeric ID (e.g. 123456789) or full vimeo.com URL"
+                  />
                   <p className="text-xs text-muted-foreground">
-                    {formData.video_provider === "youtube" &&
-                      "Paste just the YouTube video ID or any full YouTube URL (watch, youtu.be, embed, shorts)."}
-                    {formData.video_provider === "vimeo" &&
-                      "Paste just the numeric Vimeo ID or a full vimeo.com URL."}
-                    {formData.video_provider === "other" &&
-                      "Paste a full embeddable URL starting with http:// or https://."}
+                    Shown to subscribers and users with access. Leave blank to remove.
                   </p>
-                  {videoInputError && (
-                    <p className="text-xs text-destructive">{videoInputError}</p>
+                  {vimeoInputError && (
+                    <p className="text-xs text-destructive">{vimeoInputError}</p>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="youtube_input">YouTube Preview</Label>
+                  <Input
+                    id="youtube_input"
+                    value={formData.youtube_input}
+                    onChange={(e) => {
+                      setFormData({ ...formData, youtube_input: e.target.value });
+                      if (youtubeInputError) setYoutubeInputError(null);
+                    }}
+                    placeholder="Video ID (e.g. dQw4w9WgXcQ) or full YouTube URL"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Free preview shown to all visitors. Leave blank to remove.
+                  </p>
+                  {youtubeInputError && (
+                    <p className="text-xs text-destructive">{youtubeInputError}</p>
                   )}
                 </div>
                 <div>
