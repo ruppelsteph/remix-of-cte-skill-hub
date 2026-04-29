@@ -123,7 +123,9 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         ok: true,
-        videos_inserted: videosInserted,
+        videos_upserted: videosUpserted,
+        videos_skipped: videosSkipped,
+        thumbnails_set: thumbnailsSet,
         sources_inserted: sourcesInserted,
         errors: errors.slice(0, 20),
         error_count: errors.length,
