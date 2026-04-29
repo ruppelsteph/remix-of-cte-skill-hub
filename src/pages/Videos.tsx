@@ -191,46 +191,8 @@ export default function Videos() {
             </p>
           </div>
 
-          {/* Breadcrumbs */}
-          <Breadcrumb className="mb-6">
-            <BreadcrumbList>
-              <BreadcrumbItem>
-                {categoryPath.length === 0 ? (
-                  <BreadcrumbPage>All Categories</BreadcrumbPage>
-                ) : (
-                  <BreadcrumbLink
-                    onClick={goHome}
-                    className="cursor-pointer"
-                  >
-                    All Categories
-                  </BreadcrumbLink>
-                )}
-              </BreadcrumbItem>
-              {crumbs.map((c, idx) => {
-                const isLast = idx === crumbs.length - 1;
-                return (
-                  <span key={c.id} className="flex items-center gap-1.5">
-                    <BreadcrumbSeparator />
-                    <BreadcrumbItem>
-                      {isLast ? (
-                        <BreadcrumbPage>{c.name}</BreadcrumbPage>
-                      ) : (
-                        <BreadcrumbLink
-                          onClick={() => navigateToPath(categoryPath.slice(0, idx + 1))}
-                          className="cursor-pointer"
-                        >
-                          {c.name}
-                        </BreadcrumbLink>
-                      )}
-                    </BreadcrumbItem>
-                  </span>
-                );
-              })}
-            </BreadcrumbList>
-          </Breadcrumb>
-
           {/* Search and Filters */}
-          <div className="mb-8 space-y-4">
+          <div className="mb-6 space-y-4">
             <div className="relative max-w-xl">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
@@ -244,6 +206,54 @@ export default function Videos() {
                 className="pl-10"
               />
             </div>
+          </div>
+
+          {/* Breadcrumbs */}
+          <div className="mb-8 rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 shadow-sm">
+            <Breadcrumb>
+              <BreadcrumbList className="text-base">
+                <BreadcrumbItem>
+                  {categoryPath.length === 0 ? (
+                    <BreadcrumbPage className="font-semibold text-foreground">
+                      All Categories
+                    </BreadcrumbPage>
+                  ) : (
+                    <BreadcrumbLink
+                      onClick={goHome}
+                      className="cursor-pointer font-medium text-primary hover:text-primary/80"
+                    >
+                      All Categories
+                    </BreadcrumbLink>
+                  )}
+                </BreadcrumbItem>
+                {crumbs.map((c, idx) => {
+                  const isLast = idx === crumbs.length - 1;
+                  return (
+                    <span key={c.id} className="flex items-center gap-1.5">
+                      <BreadcrumbSeparator className="text-primary/60" />
+                      <BreadcrumbItem>
+                        {isLast ? (
+                          <BreadcrumbPage className="font-semibold text-foreground">
+                            {c.name}
+                          </BreadcrumbPage>
+                        ) : (
+                          <BreadcrumbLink
+                            onClick={() => navigateToPath(categoryPath.slice(0, idx + 1))}
+                            className="cursor-pointer font-medium text-primary hover:text-primary/80"
+                          >
+                            {c.name}
+                          </BreadcrumbLink>
+                        )}
+                      </BreadcrumbItem>
+                    </span>
+                  );
+                })}
+              </BreadcrumbList>
+            </Breadcrumb>
+          </div>
+
+          {/* Filters */}
+          <div className="mb-8 space-y-4">
 
             {/* Subcategory filter only inside a category */}
             {categoryPath.length > 0 && currentChildren.length > 0 && (
