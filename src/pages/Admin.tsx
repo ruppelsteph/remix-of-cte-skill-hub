@@ -45,7 +45,7 @@ const Admin = () => {
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-foreground mb-2">Admin Portal</h1>
             <p className="text-muted-foreground">
-              Manage customers, videos, pathways, and orders.
+              Manage customers, videos, categories, and orders.
             </p>
           </div>
 
