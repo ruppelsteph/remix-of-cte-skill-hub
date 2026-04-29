@@ -43,25 +43,35 @@ serve(async (req) => {
     if (!roleRow) throw new Error("Admin role required");
 
     const rows = data as Row[];
-    let videosInserted = 0;
+    let videosUpserted = 0;
     let sourcesInserted = 0;
+    let videosSkipped = 0;
+    let thumbnailsSet = 0;
     const errors: string[] = [];
 
     for (const r of rows) {
-      // Upsert video by slug
+      if (!r.slug) {
+        videosSkipped++;
+        continue;
+      }
+      const thumbnail_url = r.yt
+        ? `https://i.ytimg.com/vi/${r.yt}/hqdefault.jpg`
+        : null;
+
+      // Upsert video by slug. Set thumbnail when we have a yt id.
+      const upsertPayload: Record<string, unknown> = {
+        title: r.title,
+        slug: r.slug,
+        description: r.description,
+        category_id_new: r.category_id_new,
+        is_active: true,
+        is_free: false,
+      };
+      if (thumbnail_url) upsertPayload.thumbnail_url = thumbnail_url;
+
       const { data: vid, error: vErr } = await supabase
         .from("videos")
-        .upsert(
-          {
-            title: r.title,
-            slug: r.slug,
-            description: r.description,
-            category_id_new: r.category_id_new,
-            is_active: true,
-            is_free: false,
-          },
-          { onConflict: "slug" }
-        )
+        .upsert(upsertPayload, { onConflict: "slug" })
         .select("id")
         .single();
 
@@ -69,10 +79,22 @@ serve(async (req) => {
         errors.push(`${r.slug}: ${vErr?.message ?? "no id"}`);
         continue;
       }
-      videosInserted++;
+      videosUpserted++;
+      if (thumbnail_url) thumbnailsSet++;
 
-      // Wipe existing sources for this video to keep idempotent
-      await supabase.from("video_sources").delete().eq("video_id", vid.id);
+      // Only fill missing: skip if this video already has any source rows.
+      const { count: existingCount, error: cErr } = await supabase
+        .from("video_sources")
+        .select("id", { count: "exact", head: true })
+        .eq("video_id", vid.id);
+      if (cErr) {
+        errors.push(`${r.slug} count: ${cErr.message}`);
+        continue;
+      }
+      if ((existingCount ?? 0) > 0) {
+        videosSkipped++;
+        continue;
+      }
 
       const sources: Array<Record<string, unknown>> = [];
       if (r.yt) {
