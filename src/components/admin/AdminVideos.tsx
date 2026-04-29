@@ -71,13 +71,15 @@ export function AdminVideos() {
     title: "",
     description: "",
     thumbnail_url: "",
-    video_url: "",
+    video_provider: "youtube" as "youtube" | "vimeo" | "other",
+    video_input: "",
     duration: "",
     category_id_new: "" as string,
     skill_level: "beginner",
     is_free: false,
     is_active: true,
   });
+  const [videoInputError, setVideoInputError] = useState<string | null>(null);
 
   const fetchData = async () => {
     setIsLoading(true);
@@ -120,34 +122,107 @@ export function AdminVideos() {
   }, []);
 
 
+  // -------- Provider / URL helpers --------
+  type Provider = "youtube" | "vimeo" | "other";
+
+  const detectProvider = (url: string | null | undefined): Provider => {
+    if (!url) return "youtube";
+    if (/youtube\.com|youtu\.be/i.test(url)) return "youtube";
+    if (/vimeo\.com/i.test(url)) return "vimeo";
+    return "other";
+  };
+
+  const extractIdForEdit = (url: string | null | undefined, provider: Provider): string => {
+    if (!url) return "";
+    if (provider === "youtube") {
+      const m =
+        url.match(/[?&]v=([A-Za-z0-9_-]{11})/) ||
+        url.match(/youtu\.be\/([A-Za-z0-9_-]{11})/) ||
+        url.match(/youtube\.com\/embed\/([A-Za-z0-9_-]{11})/) ||
+        url.match(/youtube\.com\/shorts\/([A-Za-z0-9_-]{11})/);
+      return m ? m[1] : url;
+    }
+    if (provider === "vimeo") {
+      const m =
+        url.match(/player\.vimeo\.com\/video\/(\d+)/) ||
+        url.match(/vimeo\.com\/(\d+)/);
+      return m ? m[1] : url;
+    }
+    return url;
+  };
+
+  const normalizeToCanonicalUrl = (
+    input: string,
+    provider: Provider
+  ): { url: string | null; error: string | null } => {
+    const trimmed = input.trim();
+    if (!trimmed) return { url: null, error: null };
+
+    if (provider === "youtube") {
+      // Bare 11-char ID
+      if (/^[A-Za-z0-9_-]{11}$/.test(trimmed)) {
+        return { url: `https://www.youtube.com/watch?v=${trimmed}`, error: null };
+      }
+      const m =
+        trimmed.match(/[?&]v=([A-Za-z0-9_-]{11})/) ||
+        trimmed.match(/youtu\.be\/([A-Za-z0-9_-]{11})/) ||
+        trimmed.match(/youtube\.com\/embed\/([A-Za-z0-9_-]{11})/) ||
+        trimmed.match(/youtube\.com\/shorts\/([A-Za-z0-9_-]{11})/);
+      if (m) return { url: `https://www.youtube.com/watch?v=${m[1]}`, error: null };
+      return { url: null, error: "Couldn't recognize that as a YouTube ID or URL" };
+    }
+
+    if (provider === "vimeo") {
+      if (/^\d+$/.test(trimmed)) {
+        return { url: `https://vimeo.com/${trimmed}`, error: null };
+      }
+      const m =
+        trimmed.match(/player\.vimeo\.com\/video\/(\d+)/) ||
+        trimmed.match(/vimeo\.com\/(\d+)/);
+      if (m) return { url: `https://vimeo.com/${m[1]}`, error: null };
+      return { url: null, error: "Couldn't recognize that as a Vimeo ID or URL" };
+    }
+
+    // Other
+    if (!/^https?:\/\//i.test(trimmed)) {
+      return { url: null, error: "Must be a full URL starting with http:// or https://" };
+    }
+    return { url: trimmed, error: null };
+  };
+
   const resetForm = () => {
     setFormData({
       title: "",
       description: "",
       thumbnail_url: "",
-      video_url: "",
+      video_provider: "youtube",
+      video_input: "",
       duration: "",
       category_id_new: "",
       skill_level: "beginner",
       is_free: false,
       is_active: true,
     });
+    setVideoInputError(null);
     setEditingVideo(null);
   };
 
   const handleEdit = (video: VideoData) => {
+    const provider = detectProvider(video.video_url);
     setEditingVideo(video);
     setFormData({
       title: video.title,
       description: video.description || "",
       thumbnail_url: video.thumbnail_url || "",
-      video_url: video.video_url || "",
+      video_provider: provider,
+      video_input: extractIdForEdit(video.video_url, provider),
       duration: video.duration || "",
       category_id_new: video.category_id_new ? String(video.category_id_new) : "",
       skill_level: video.skill_level || "beginner",
       is_free: video.is_free,
       is_active: video.is_active,
     });
+    setVideoInputError(null);
     setIsDialogOpen(true);
   };
 
@@ -167,7 +242,16 @@ export function AdminVideos() {
         is_active: formData.is_active,
       };
 
-      const trimmedUrl = formData.video_url.trim();
+      const { url: canonicalUrl, error: urlError } = normalizeToCanonicalUrl(
+        formData.video_input,
+        formData.video_provider
+      );
+      if (urlError) {
+        setVideoInputError(urlError);
+        setIsSaving(false);
+        return;
+      }
+      const trimmedUrl = canonicalUrl ?? "";
       let videoId: string;
 
       if (editingVideo) {
@@ -342,14 +426,52 @@ export function AdminVideos() {
                     rows={3}
                   />
                 </div>
-                <div>
-                  <Label htmlFor="video_url">Video URL</Label>
-                  <Input
-                    id="video_url"
-                    value={formData.video_url}
-                    onChange={(e) => setFormData({ ...formData, video_url: e.target.value })}
-                    placeholder="https://..."
-                  />
+                <div className="space-y-2">
+                  <Label>Video Source</Label>
+                  <div className="grid grid-cols-[140px_1fr] gap-2">
+                    <Select
+                      value={formData.video_provider}
+                      onValueChange={(value: "youtube" | "vimeo" | "other") => {
+                        setFormData({ ...formData, video_provider: value });
+                        setVideoInputError(null);
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="youtube">YouTube</SelectItem>
+                        <SelectItem value="vimeo">Vimeo</SelectItem>
+                        <SelectItem value="other">Other (full URL)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Input
+                      id="video_input"
+                      value={formData.video_input}
+                      onChange={(e) => {
+                        setFormData({ ...formData, video_input: e.target.value });
+                        if (videoInputError) setVideoInputError(null);
+                      }}
+                      placeholder={
+                        formData.video_provider === "youtube"
+                          ? "Video ID (e.g. dQw4w9WgXcQ) or full URL"
+                          : formData.video_provider === "vimeo"
+                          ? "Numeric ID (e.g. 123456789) or full URL"
+                          : "https://..."
+                      }
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {formData.video_provider === "youtube" &&
+                      "Paste just the YouTube video ID or any full YouTube URL (watch, youtu.be, embed, shorts)."}
+                    {formData.video_provider === "vimeo" &&
+                      "Paste just the numeric Vimeo ID or a full vimeo.com URL."}
+                    {formData.video_provider === "other" &&
+                      "Paste a full embeddable URL starting with http:// or https://."}
+                  </p>
+                  {videoInputError && (
+                    <p className="text-xs text-destructive">{videoInputError}</p>
+                  )}
                 </div>
                 <div>
                   <Label htmlFor="thumbnail_url">Thumbnail URL</Label>

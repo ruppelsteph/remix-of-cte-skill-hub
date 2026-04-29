@@ -1,105 +1,56 @@
-## Plan: Add `group_admin` role with groups & group memberships
+# Provider + ID input for video sources
 
-### Goal
-Introduce a third role (`group_admin`) so a user can own a group and manage students inside it. No purchasing/coupons yet.
+Make the admin Edit Video form accept either a full URL or just a YouTube/Vimeo ID, by introducing an explicit Provider selector. We normalize to a canonical URL **on save** so the existing player code keeps working unchanged.
 
----
+## Why this approach
 
-### 1. Database changes (single migration)
+- The player in `src/pages/VideoDetail.tsx` already converts canonical YouTube/Vimeo URLs into embed URLs (`buildEmbedUrl`). If we store canonical URLs, no player changes are needed.
+- Storing canonical URLs (not bare IDs) keeps `video_sources.video_url` self-describing, so any other consumer (exports, debugging, future players) still works.
+- Provider is explicit, so a numeric Vimeo ID can't be confused with anything else.
 
-**a. Extend `app_role` enum**
-- Add `'group_admin'` value to existing `app_role` enum (keeps `user_roles` table as the source of truth — same pattern as `admin`).
+## UI changes (`src/components/admin/AdminVideos.tsx`)
 
-**b. Extend `profiles`**
-- Add `role text not null default 'user'` with a CHECK constraint limiting values to `'user' | 'admin' | 'group_admin'`. This is a denormalized convenience field per the spec; authoritative role checks still go through `user_roles` + `has_role()`.
-- Add `group_id uuid` (nullable) — points to the group a user belongs to (filled in for students and the owning group_admin).
+Replace the single "Video URL" input with two fields:
 
-**c. New table: `groups`**
-```
-id          uuid pk default gen_random_uuid()
-name        text not null
-created_by  uuid not null  -- references auth.users(id) implicitly (no FK to auth.users per Lovable rules)
-created_at  timestamptz not null default now()
-```
-- Enable RLS.
-- FK from `profiles.group_id` → `groups(id) on delete set null` added after table exists.
+1. **Provider** — Select with options: `YouTube`, `Vimeo`, `Other (full URL)`.
+2. **Video ID or URL** — Text input. Helper text adapts to provider:
+   - YouTube: "Paste the video ID (e.g. `dQw4w9WgXcQ`) or a full YouTube URL"
+   - Vimeo: "Paste the numeric ID (e.g. `123456789`) or a full Vimeo URL"
+   - Other: "Paste the full embeddable URL"
 
-**d. New table: `group_members`**
-```
-id          uuid pk default gen_random_uuid()
-group_id    uuid not null references public.groups(id) on delete cascade
-user_id     uuid not null
-role        text not null check (role in ('group_admin','student'))
-created_at  timestamptz not null default now()
-unique (group_id, user_id)
-```
-- Enable RLS.
+When opening Edit on an existing video, detect the provider from the stored URL and pre-fill the field with the extracted ID (or the full URL for "Other").
 
-**e. Helper security-definer function (avoids RLS recursion)**
-```
-public.is_group_admin_of(_group_id uuid)
-  returns boolean
-  language sql stable security definer set search_path = public
-  as $$
-    select exists (
-      select 1 from public.group_members
-      where group_id = _group_id
-        and user_id = auth.uid()
-        and role = 'group_admin'
-    )
-  $$;
+## Save-time normalization
+
+Before upserting into `video_sources`, normalize to a canonical URL:
+
+```text
+YouTube  -> https://www.youtube.com/watch?v=<ID>
+Vimeo    -> https://vimeo.com/<ID>
+Other    -> stored as entered (basic http(s) validation)
 ```
 
-**f. Trigger: when a user becomes `group_admin`**
-- Trigger on `INSERT` into `public.user_roles` where `role = 'group_admin'`:
-  1. Create a new row in `groups` with `name = 'New Group'` (placeholder, editable later) and `created_by = NEW.user_id`.
-  2. Insert `(group_id, user_id, role='group_admin')` into `group_members`.
-  3. Update the user's `profiles.role = 'group_admin'` and `profiles.group_id = <new group id>`.
-- Mirror trigger to keep `profiles.role` in sync when an `admin` row is inserted/deleted from `user_roles` (so the convenience column stays accurate).
+Extraction rules for the input field:
 
----
+- **YouTube**: accept `dQw4w9WgXcQ` (11 chars, `[A-Za-z0-9_-]`), or extract ID from `youtu.be/<id>`, `youtube.com/watch?v=<id>`, `youtube.com/embed/<id>`, `youtube.com/shorts/<id>`.
+- **Vimeo**: accept all-digit ID, or extract from `vimeo.com/<digits>` and `player.vimeo.com/video/<digits>`.
+- **Other**: must start with `http://` or `https://`, otherwise show a validation error and block save.
 
-### 2. RLS policies
+If extraction fails for YouTube/Vimeo, show an inline error ("Couldn't recognize that as a YouTube/Vimeo ID or URL") and block save.
 
-**`groups`**
-- SELECT: members of the group OR admins.
-  `is_group_admin_of(id) OR exists(select 1 from group_members where group_id = groups.id and user_id = auth.uid()) OR has_role(auth.uid(),'admin')`
-- UPDATE: group_admin of the group OR site admin.
-- INSERT: site admin only (group_admins get their group via the trigger, not a direct insert).
-- DELETE: site admin only.
+## What does NOT change
 
-**`group_members`**
-- SELECT (own membership): `user_id = auth.uid()`.
-- SELECT (manage): `is_group_admin_of(group_id) OR has_role(auth.uid(),'admin')`.
-- INSERT: `is_group_admin_of(group_id) OR has_role(auth.uid(),'admin')`, with check that the new row's role is `'student'` for group_admins (only site admins can add another `group_admin`).
-- UPDATE / DELETE: `is_group_admin_of(group_id) OR has_role(auth.uid(),'admin')`.
+- Database schema (`video_sources.video_url` stays a `text` column with full URLs).
+- RLS policies.
+- `VideoDetail.tsx` player and `buildEmbedUrl` (already handles canonical URLs).
+- Edge functions / seed import.
 
-(`profiles` policies stay as-is.)
+## Files touched
 
----
+- `src/components/admin/AdminVideos.tsx` — form fields, prefill-on-edit, normalization, validation.
 
-### 3. Frontend changes (minimal — wiring only, no new pages yet)
+## Out of scope (call out if you want them)
 
-- **`src/components/admin/AdminUsers.tsx`**
-  - Widen `RoleRow.role` type to `'admin' | 'user' | 'group_admin'`.
-  - Replace the single Demote/Promote button with a small role selector (user / admin / group_admin) that inserts/deletes the corresponding `user_roles` row. Selecting `group_admin` inserts the role; the DB trigger does the rest.
-  - Show the role in the existing Role column (admin / group_admin / user badge).
-- **`src/contexts/AuthContext.tsx`**
-  - Add `isGroupAdmin: boolean` derived from a `has_role(_, 'group_admin')` check (parallel to `checkAdminRole`). Expose on context.
-- **`src/integrations/supabase/types.ts`** is auto-generated — no manual edits.
-
-No new routes/pages this round; group dashboard UI is out of scope per "Do not implement purchasing or coupons yet" and to keep the change small. We can add `/group` admin UI in a follow-up.
-
----
-
-### 4. Out of scope (call out for later)
-- A dedicated Group Admin dashboard (invite students, list members, rename group).
-- Linking purchases/coupons to groups.
-- Bulk seat assignment, billing per seat.
-
----
-
-### Technical notes
-- Roles authority remains `public.user_roles` + `has_role()` — no privilege checks read from `profiles.role`. The new `profiles.role` column is only for display convenience and is kept in sync by triggers.
-- `group_id` on `profiles` is nullable; only set automatically for the group_admin's own group. Students get `group_id` populated when added to `group_members` (via trigger).
-- Enum value addition (`alter type ... add value 'group_admin'`) must run in its own statement before being used — handled in the migration ordering.
+- Auto-fetching titles/thumbnails from YouTube/Vimeo oEmbed.
+- Supporting additional providers (Wistia, Loom, direct MP4 metadata, etc.).
+- Migrating already-stored URLs (existing rows are already canonical-ish and will continue to work).
