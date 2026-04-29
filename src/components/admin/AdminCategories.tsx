@@ -387,59 +387,15 @@ export function AdminCategories() {
           </div>
         ) : (
           <div className="space-y-1">
-            {flat.map((c) => (
-              <div
-                key={c.id}
-                className="flex items-center justify-between rounded-md border bg-card px-3 py-2 hover:bg-accent/40 transition-colors"
-                style={{ marginLeft: `${c.depth * 24}px` }}
-              >
-                <div className="flex items-center gap-2 min-w-0">
-                  {c.depth > 0 && (
-                    <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
-                  )}
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <button
-                        type="button"
-                        onClick={() => setVideosCategory(c)}
-                        className="font-medium truncate text-left hover:text-primary hover:underline focus:outline-none focus:text-primary"
-                        title="View videos in this category"
-                      >
-                        {c.name}
-                      </button>
-                      {!c.is_active && <Badge variant="secondary">Inactive</Badge>}
-                      <Badge variant="outline" className="text-xs">
-                        {c.videoCount} video{c.videoCount === 1 ? "" : "s"}
-                      </Badge>
-                    </div>
-                    {c.description && (
-                      <p className="text-xs text-muted-foreground truncate">{c.description}</p>
-                    )}
-                  </div>
-                </div>
-                <div className="flex items-center gap-1 shrink-0">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => openCreate(c.id)}
-                    title="Add subcategory"
-                  >
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                  <Button variant="ghost" size="sm" onClick={() => openEdit(c)} title="Edit">
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleDelete(c)}
-                    className="text-destructive hover:text-destructive"
-                    title="Delete"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
+            {tree.map((root) => (
+              <CategoryRow
+                key={root.id}
+                node={root}
+                onView={(c) => setVideosCategory(c)}
+                onAddChild={(id) => openCreate(id)}
+                onEdit={(c) => openEdit(c)}
+                onDelete={(c) => handleDelete(c)}
+              />
             ))}
           </div>
         )}
