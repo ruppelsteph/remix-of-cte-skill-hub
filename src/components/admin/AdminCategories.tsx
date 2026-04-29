@@ -456,3 +456,81 @@ export function AdminCategories() {
     </Card>
   );
 }
+
+interface CategoryRowProps {
+  node: CategoryNode;
+  onView: (c: CategoryNode) => void;
+  onAddChild: (id: number) => void;
+  onEdit: (c: CategoryNode) => void;
+  onDelete: (c: CategoryNode) => void;
+}
+
+function CategoryRow({ node, onView, onAddChild, onEdit, onDelete }: CategoryRowProps) {
+  const hasChildren = node.children.length > 0;
+  return (
+    <div>
+      <div className="flex items-center justify-between rounded-md border bg-card px-3 py-2 hover:bg-accent/40 transition-colors">
+        <div className="flex items-center gap-2 min-w-0">
+          {node.depth > 0 && (
+            <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+          )}
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                type="button"
+                onClick={() => onView(node)}
+                className="font-medium truncate text-left hover:text-primary hover:underline focus:outline-none focus:text-primary"
+                title="View videos in this category"
+              >
+                {node.name}
+              </button>
+              {!node.is_active && <Badge variant="secondary">Inactive</Badge>}
+              <Badge variant="outline" className="text-xs">
+                {node.videoCount} video{node.videoCount === 1 ? "" : "s"}
+              </Badge>
+              {hasChildren && (
+                <Badge variant="outline" className="text-xs">
+                  {node.children.length} subcategor{node.children.length === 1 ? "y" : "ies"}
+                </Badge>
+              )}
+            </div>
+            {node.description && (
+              <p className="text-xs text-muted-foreground truncate">{node.description}</p>
+            )}
+          </div>
+        </div>
+        <div className="flex items-center gap-1 shrink-0">
+          <Button variant="ghost" size="sm" onClick={() => onAddChild(node.id)} title="Add subcategory">
+            <Plus className="h-4 w-4" />
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => onEdit(node)} title="Edit">
+            <Pencil className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => onDelete(node)}
+            className="text-destructive hover:text-destructive"
+            title="Delete"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+      {hasChildren && (
+        <div className="ml-6 mt-1 space-y-1 border-l-2 border-border pl-3">
+          {node.children.map((child) => (
+            <CategoryRow
+              key={child.id}
+              node={child}
+              onView={onView}
+              onAddChild={onAddChild}
+              onEdit={onEdit}
+              onDelete={onDelete}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
