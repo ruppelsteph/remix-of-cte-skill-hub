@@ -242,7 +242,16 @@ export function AdminVideos() {
         is_active: formData.is_active,
       };
 
-      const trimmedUrl = formData.video_url.trim();
+      const { url: canonicalUrl, error: urlError } = normalizeToCanonicalUrl(
+        formData.video_input,
+        formData.video_provider
+      );
+      if (urlError) {
+        setVideoInputError(urlError);
+        setIsSaving(false);
+        return;
+      }
+      const trimmedUrl = canonicalUrl ?? "";
       let videoId: string;
 
       if (editingVideo) {
