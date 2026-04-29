@@ -444,6 +444,59 @@ export function AdminCategories() {
           </div>
         )}
       </CardContent>
+
+      {/* Videos in category dialog */}
+      <Dialog open={!!videosCategory} onOpenChange={(open) => !open && setVideosCategory(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>
+              Videos in “{videosCategory?.name}”
+            </DialogTitle>
+            <DialogDescription>
+              {videosCategory
+                ? `${allVideos.filter((v) => v.category_id_new === videosCategory.id).length} video(s) directly assigned to this category.`
+                : ""}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[60vh] overflow-y-auto space-y-2">
+            {videosCategory &&
+              (() => {
+                const list = allVideos.filter((v) => v.category_id_new === videosCategory.id);
+                if (list.length === 0) {
+                  return (
+                    <p className="text-sm text-muted-foreground text-center py-8">
+                      No videos assigned to this category yet.
+                    </p>
+                  );
+                }
+                return list.map((v) => (
+                  <div
+                    key={v.id}
+                    className="flex items-center justify-between rounded-md border bg-card px-3 py-2"
+                  >
+                    <div className="min-w-0">
+                      <p className="font-medium truncate">{v.title}</p>
+                      <div className="flex items-center gap-2 mt-1 flex-wrap">
+                        {v.duration && (
+                          <span className="text-xs text-muted-foreground">{v.duration}</span>
+                        )}
+                        {v.is_free && <Badge variant="outline" className="text-xs">Free</Badge>}
+                        {v.is_active === false && (
+                          <Badge variant="secondary" className="text-xs">Inactive</Badge>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ));
+              })()}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setVideosCategory(null)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
