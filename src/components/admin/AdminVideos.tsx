@@ -89,20 +89,24 @@ export function AdminVideos() {
       const [videosRes, categoriesRes, sourcesRes] = await Promise.all([
         supabase.from("videos").select("*").order("created_at", { ascending: false }),
         supabase.from("categories").select("id, name").order("name"),
-        supabase.from("video_sources").select("video_id, video_url"),
+        supabase.from("video_sources").select("video_id, video_url, kind"),
       ]);
 
       if (videosRes.error) throw videosRes.error;
       if (categoriesRes.error) throw categoriesRes.error;
       if (sourcesRes.error) throw sourcesRes.error;
 
-      const urlByVideo = new Map<string, string>(
-        (sourcesRes.data || []).map((s) => [s.video_id, s.video_url])
-      );
+      const vimeoByVideo = new Map<string, string>();
+      const youtubeByVideo = new Map<string, string>();
+      for (const s of sourcesRes.data || []) {
+        if (s.kind === "vimeo") vimeoByVideo.set(s.video_id, s.video_url);
+        else if (s.kind === "youtube") youtubeByVideo.set(s.video_id, s.video_url);
+      }
 
       const merged: VideoData[] = (videosRes.data || []).map((v) => ({
         ...v,
-        video_url: urlByVideo.get(v.id) ?? null,
+        vimeo_url: vimeoByVideo.get(v.id) ?? null,
+        youtube_url: youtubeByVideo.get(v.id) ?? null,
       }));
 
       setVideos(merged);
