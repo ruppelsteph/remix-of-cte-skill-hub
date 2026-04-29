@@ -62,10 +62,12 @@ const slugify = (s: string) =>
 export function AdminCategories() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [videoCounts, setVideoCounts] = useState<Map<number, number>>(new Map());
+  const [allVideos, setAllVideos] = useState<VideoLite[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Category | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [videosCategory, setVideosCategory] = useState<CategoryNode | null>(null);
   const { toast } = useToast();
 
   const [formData, setFormData] = useState({
