@@ -71,9 +71,9 @@ const Admin = () => {
                 <Video className="h-4 w-4" />
                 <span className="hidden sm:inline">Videos</span>
               </TabsTrigger>
-              <TabsTrigger value="pathways" className="flex items-center gap-2">
+              <TabsTrigger value="categories" className="flex items-center gap-2">
                 <FolderOpen className="h-4 w-4" />
-                <span className="hidden sm:inline">Pathways</span>
+                <span className="hidden sm:inline">Categories</span>
               </TabsTrigger>
             </TabsList>
 
