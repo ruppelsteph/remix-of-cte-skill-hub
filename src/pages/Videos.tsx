@@ -36,6 +36,23 @@ import distillationImg from "@/assets/category-distillation.jpg";
 import processEquipmentImg from "@/assets/category-process-equipment.jpg";
 import pumpsImg from "@/assets/category-pumps.jpg";
 import valvesImg from "@/assets/category-valves.jpg";
+import criminalJusticeImg from "@/assets/category-criminal-justice.jpg";
+import computersImg from "@/assets/category-computers.jpg";
+import healthScienceImg from "@/assets/category-health-science.jpg";
+import hvacImg from "@/assets/category-hvac.jpg";
+import mobileEquipmentImg from "@/assets/category-mobile-equipment.jpg";
+import utilityLineTechImg from "@/assets/category-utility-line-tech.jpg";
+import weldingImg from "@/assets/category-welding.jpg";
+import anatomyPhysiologyImg from "@/assets/category-anatomy-physiology.jpg";
+import cnaImg from "@/assets/category-cna.jpg";
+import medicalTerminologyImg from "@/assets/category-medical-terminology.jpg";
+import hvacBasicsImg from "@/assets/category-hvac-basics.jpg";
+import hvacPerformanceImg from "@/assets/category-hvac-performance.jpg";
+import cellStructureImg from "@/assets/category-cell-structure.jpg";
+import mappingTheBodyImg from "@/assets/category-mapping-the-body.jpg";
+import bodySystemsImg from "@/assets/category-body-systems.jpg";
+import ductSystemDesignImg from "@/assets/category-duct-system-design.jpg";
+import hvacComponentsImg from "@/assets/category-hvac-components.jpg";
 
 type Category = {
   id: number;
@@ -71,6 +88,28 @@ const CATEGORY_IMAGE_BY_SLUG: Record<string, string> = {
   "process-equipment": processEquipmentImg,
   pumps: pumpsImg,
   valves: valvesImg,
+  // Additional top-level
+  "criminal-justice": criminalJusticeImg,
+  computers: computersImg,
+  "health-science": healthScienceImg,
+  hvac: hvacImg,
+  "mobile-equipment": mobileEquipmentImg,
+  "utility-line-tech": utilityLineTechImg,
+  welding: weldingImg,
+  // Health Science subcategories
+  "anatomy-physiology": anatomyPhysiologyImg,
+  cna: cnaImg,
+  "medical-terminology": medicalTerminologyImg,
+  // Anatomy & Physiology subcategories
+  "cell-structure": cellStructureImg,
+  "mapping-the-body": mappingTheBodyImg,
+  "body-systems": bodySystemsImg,
+  // HVAC subcategories
+  "hvac-basics": hvacBasicsImg,
+  "hvac-performance": hvacPerformanceImg,
+  // HVAC Basics subcategories
+  "duct-system-design": ductSystemDesignImg,
+  "hvac-components": hvacComponentsImg,
 };
 
 export default function Videos() {
