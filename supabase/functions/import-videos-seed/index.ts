@@ -14,8 +14,10 @@ interface Row {
   slug: string;
   description: string;
   category_id_new: number;
-  yt: string | null;
-  vm: string | null;
+  yt?: string | null;
+  vm?: string | null;
+  yt_embed_code?: string | null;
+  vm_embed_code?: string | null;
 }
 
 serve(async (req) => {
@@ -54,8 +56,11 @@ serve(async (req) => {
         videosSkipped++;
         continue;
       }
-      const thumbnail_url = r.yt
-        ? `https://i.ytimg.com/vi/${r.yt}/hqdefault.jpg`
+      const youtubeCode = (r.yt_embed_code ?? r.yt ?? "").trim();
+      const vimeoCode = (r.vm_embed_code ?? r.vm ?? "").trim();
+
+      const thumbnail_url = youtubeCode
+        ? `https://i.ytimg.com/vi/${youtubeCode}/hqdefault.jpg`
         : null;
 
       // Upsert video by slug. Set thumbnail when we have a yt id.
@@ -96,19 +101,19 @@ serve(async (req) => {
 
       const sources: Array<Record<string, unknown>> = [];
       // YouTube preview = the short, free video everyone can watch.
-      if (r.yt && !hasYoutube) {
+      if (youtubeCode && !hasYoutube) {
         sources.push({
           video_id: vid.id,
-          video_url: `https://www.youtube.com/watch?v=${r.yt}`,
+          video_url: `https://www.youtube.com/watch?v=${youtubeCode}`,
           is_preview: true,
           kind: "youtube",
         });
       }
       // Vimeo = the full video, gated behind subscription/access.
-      if (r.vm && !hasVimeo) {
+      if (vimeoCode && !hasVimeo) {
         sources.push({
           video_id: vid.id,
-          video_url: `https://vimeo.com/${r.vm}`,
+          video_url: `https://vimeo.com/${vimeoCode}`,
           is_preview: false,
           kind: "vimeo",
         });
