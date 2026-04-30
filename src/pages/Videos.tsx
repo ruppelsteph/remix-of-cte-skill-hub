@@ -17,42 +17,49 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 
-import industrialImg from "@/assets/category-industrial.jpg";
-import buildingsImg from "@/assets/category-buildings-trades.jpg";
-import cosmetologyImg from "@/assets/category-cosmetology.jpg";
-import cosmetologyStateBoardImg from "@/assets/category-cosmetology-state-board.jpg";
-import analyzersImg from "@/assets/category-analyzers.jpg";
-import electricalImg from "@/assets/category-electrical.jpg";
-import instrumentationImg from "@/assets/category-instrumentation.jpg";
-import mechanicalImg from "@/assets/category-mechanical.jpg";
-import processTechnologyImg from "@/assets/category-process-technology.jpg";
-import basicInstrumentationImg from "@/assets/category-basic-instrumentation.jpg";
-import calibrationImg from "@/assets/category-calibration.jpg";
-import maintenanceImg from "@/assets/category-maintenance.jpg";
-import tubeBendingImg from "@/assets/category-tube-bending.jpg";
-import compressorsImg from "@/assets/category-compressors.jpg";
-import coolingTowersImg from "@/assets/category-cooling-towers.jpg";
-import distillationImg from "@/assets/category-distillation.jpg";
-import processEquipmentImg from "@/assets/category-process-equipment.jpg";
-import pumpsImg from "@/assets/category-pumps.jpg";
-import valvesImg from "@/assets/category-valves.jpg";
-import criminalJusticeImg from "@/assets/category-criminal-justice.jpg";
-import computersImg from "@/assets/category-computers.jpg";
-import healthScienceImg from "@/assets/category-health-science.jpg";
-import hvacImg from "@/assets/category-hvac.jpg";
-import mobileEquipmentImg from "@/assets/category-mobile-equipment.jpg";
-import utilityLineTechImg from "@/assets/category-utility-line-tech.jpg";
-import weldingImg from "@/assets/category-welding.jpg";
-import anatomyPhysiologyImg from "@/assets/category-anatomy-physiology.jpg";
-import cnaImg from "@/assets/category-cna.jpg";
-import medicalTerminologyImg from "@/assets/category-medical-terminology.jpg";
-import hvacBasicsImg from "@/assets/category-hvac-basics.jpg";
-import hvacPerformanceImg from "@/assets/category-hvac-performance.jpg";
-import cellStructureImg from "@/assets/category-cell-structure.jpg";
-import mappingTheBodyImg from "@/assets/category-mapping-the-body.jpg";
-import bodySystemsImg from "@/assets/category-body-systems.jpg";
-import ductSystemDesignImg from "@/assets/category-duct-system-design.jpg";
-import hvacComponentsImg from "@/assets/category-hvac-components.jpg";
+const S3_BASE = "https://cte-email-assets.s3.us-east-1.amazonaws.com/categories";
+
+const KNOWN_CATEGORY_SLUGS = new Set<string>([
+  "industrial",
+  "buildings-trades",
+  "cosmetology",
+  "cosmetology-state-board",
+  "analyzers",
+  "electrical",
+  "instrumentation",
+  "mechanical",
+  "process-technology",
+  "basic-instrumentation",
+  "calibration",
+  "maintenance",
+  "tube-bending",
+  "compressors",
+  "cooling-towers",
+  "distillation",
+  "process-equipment",
+  "pumps",
+  "valves",
+  "criminal-justice",
+  "computers",
+  "health-science",
+  "hvac",
+  "mobile-equipment",
+  "utility-line-tech",
+  "welding",
+  "anatomy-physiology",
+  "cna",
+  "medical-terminology",
+  "cell-structure",
+  "mapping-the-body",
+  "body-systems",
+  "hvac-basics",
+  "hvac-performance",
+  "duct-system-design",
+  "hvac-components",
+]);
+
+const imageUrlForSlug = (slug: string): string | null =>
+  KNOWN_CATEGORY_SLUGS.has(slug) ? `${S3_BASE}/${slug}.jpg` : null;
 
 type Category = {
   id: number;
@@ -61,55 +68,6 @@ type Category = {
   description: string | null;
   parent_id: number | null;
   is_active: boolean;
-};
-
-const CATEGORY_IMAGE_BY_SLUG: Record<string, string> = {
-  // Top-level
-  industrial: industrialImg,
-  "buildings-trades": buildingsImg,
-  cosmetology: cosmetologyImg,
-  // Cosmetology subcategories
-  "cosmetology-state-board": cosmetologyStateBoardImg,
-  // Industrial subcategories
-  analyzers: analyzersImg,
-  electrical: electricalImg,
-  instrumentation: instrumentationImg,
-  mechanical: mechanicalImg,
-  "process-technology": processTechnologyImg,
-  // Instrumentation subcategories
-  "basic-instrumentation": basicInstrumentationImg,
-  calibration: calibrationImg,
-  maintenance: maintenanceImg,
-  "tube-bending": tubeBendingImg,
-  // Process Technology subcategories
-  compressors: compressorsImg,
-  "cooling-towers": coolingTowersImg,
-  distillation: distillationImg,
-  "process-equipment": processEquipmentImg,
-  pumps: pumpsImg,
-  valves: valvesImg,
-  // Additional top-level
-  "criminal-justice": criminalJusticeImg,
-  computers: computersImg,
-  "health-science": healthScienceImg,
-  hvac: hvacImg,
-  "mobile-equipment": mobileEquipmentImg,
-  "utility-line-tech": utilityLineTechImg,
-  welding: weldingImg,
-  // Health Science subcategories
-  "anatomy-physiology": anatomyPhysiologyImg,
-  cna: cnaImg,
-  "medical-terminology": medicalTerminologyImg,
-  // Anatomy & Physiology subcategories
-  "cell-structure": cellStructureImg,
-  "mapping-the-body": mappingTheBodyImg,
-  "body-systems": bodySystemsImg,
-  // HVAC subcategories
-  "hvac-basics": hvacBasicsImg,
-  "hvac-performance": hvacPerformanceImg,
-  // HVAC Basics subcategories
-  "duct-system-design": ductSystemDesignImg,
-  "hvac-components": hvacComponentsImg,
 };
 
 export default function Videos() {
@@ -256,8 +214,8 @@ export default function Videos() {
   const imageForCategory = (cat: Category): string | null => {
     let cur: Category | undefined = cat;
     while (cur) {
-      const img = CATEGORY_IMAGE_BY_SLUG[cur.slug];
-      if (img) return img;
+      const url = imageUrlForSlug(cur.slug);
+      if (url) return url;
       if (cur.parent_id == null) break;
       cur = categoriesById.get(cur.parent_id);
     }
@@ -374,19 +332,21 @@ export default function Videos() {
                       )}
                     >
                       <div className="relative aspect-[4/3] w-full overflow-hidden bg-muted">
-                        {img ? (
+                        <div className="absolute inset-0 flex items-center justify-center bg-primary/10">
+                          <FolderOpen className="h-12 w-12 text-primary" />
+                        </div>
+                        {img && (
                           <img
                             src={img}
                             alt={cat.name}
                             loading="lazy"
                             width={800}
                             height={600}
-                            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                            onError={(e) => {
+                              (e.currentTarget as HTMLImageElement).style.display = "none";
+                            }}
+                            className="relative h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                           />
-                        ) : (
-                          <div className="flex h-full w-full items-center justify-center bg-primary/10">
-                            <FolderOpen className="h-12 w-12 text-primary" />
-                          </div>
                         )}
                         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
                         <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between">
