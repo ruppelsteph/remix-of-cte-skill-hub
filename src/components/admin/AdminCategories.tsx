@@ -178,6 +178,12 @@ export function AdminCategories() {
     return out;
   }, [tree]);
 
+  const categoriesById = useMemo(() => {
+    const map = new Map<number, Category>();
+    categories.forEach((c) => map.set(c.id, c));
+    return map;
+  }, [categories]);
+
   // Compute descendants for a given id (to prevent assigning self/descendant as parent)
   const descendantIds = (id: number): Set<number> => {
     const ids = new Set<number>();
