@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { User, CreditCard, CheckCircle, XCircle, ArrowRight, Settings, Loader2, RefreshCw } from "lucide-react";
+import { User, CreditCard, CheckCircle, XCircle, ArrowRight, Settings, Loader2, RefreshCw, Copy, Link as LinkIcon, Users } from "lucide-react";
 import { format } from "date-fns";
 
 const Account = () => {
@@ -15,6 +15,10 @@ const Account = () => {
   const { toast } = useToast();
   const hasHandledSuccess = useRef(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [groupSuccess, setGroupSuccess] = useState<{
+    couponCode: string | null;
+    seatCount: number | null;
+  } | null>(null);
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -62,10 +66,11 @@ const Account = () => {
             seatCount = data?.seatCount ?? null;
           }
           await supabase.functions.invoke("sync-subscription").catch(() => {});
+          setGroupSuccess({ couponCode, seatCount });
           toast({
             title: "Group purchase successful!",
             description: couponCode
-              ? `Your coupon code is ${couponCode}${seatCount ? ` (${seatCount} seats)` : ""}.`
+              ? `Your class code ${couponCode} is ready to share.`
               : "Your group is set up and ready to go.",
           });
           await refreshSubscription();
