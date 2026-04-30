@@ -4,7 +4,6 @@ import { Facebook, Twitter, Linkedin, Youtube, Mail } from "lucide-react";
 const footerLinks = {
   platform: [
     { label: "Video Library", href: "/videos" },
-    { label: "CTE Pathways", href: "/pathways" },
     { label: "Pricing", href: "/pricing" },
     { label: "For Schools", href: "/schools" },
   ],
