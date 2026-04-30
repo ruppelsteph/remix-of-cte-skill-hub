@@ -420,6 +420,7 @@ export function AdminCategories() {
               <CategoryRow
                 key={root.id}
                 node={root}
+                categoriesById={categoriesById}
                 onView={(c) => setVideosCategory(c)}
                 onAddChild={(id) => openCreate(id)}
                 onEdit={(c) => openEdit(c)}
