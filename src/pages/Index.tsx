@@ -95,40 +95,7 @@ const Index = () => {
         </div>
       </section>
 
-      {/* CTE Pathways Section */}
-      <section className="py-16 lg:py-24 bg-background">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
-              CTE Pathways Covered
-            </h2>
-            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Comprehensive video training aligned with industry standards across all major Career & Technical Education pathways.
-            </p>
-          </div>
-          {pathwaysLoading ? (
-            <div className="flex justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            </div>
-          ) : pathways.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {pathways.map((pathway) => (
-                <PathwayCard key={pathway.id} pathway={pathway} />
-              ))}
-            </div>
-          ) : (
-            <p className="text-center text-muted-foreground">No pathways available yet.</p>
-          )}
-          <div className="text-center mt-10">
-            <Button asChild variant="outline" size="lg">
-              <Link to="/pathways">
-                View All Pathways
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
-          </div>
-        </div>
-      </section>
+      {/* CTE Pathways Section — hidden for now */}
 
       {/* Why CTE Skills Section */}
       <section className="py-16 lg:py-24 bg-muted/30">
