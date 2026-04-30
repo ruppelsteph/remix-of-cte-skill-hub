@@ -346,6 +346,14 @@ export function GroupAdminCoupons() {
                             <Button
                               size="sm"
                               variant="ghost"
+                              onClick={() => copyInviteLink(c.code)}
+                              title="Copy invite link to share with students"
+                            >
+                              <LinkIcon className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
                               onClick={() => regenerate(c)}
                               disabled={busyId === c.id}
                               title="Regenerate code"
