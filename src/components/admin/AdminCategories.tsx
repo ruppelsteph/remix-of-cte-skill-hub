@@ -24,7 +24,24 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, Plus, Pencil, Trash2, FolderTree, ChevronRight } from "lucide-react";
+import { Loader2, Plus, Pencil, Trash2, FolderTree, ChevronRight, ImageIcon } from "lucide-react";
+
+const S3_BASE = "https://cte-email-assets.s3.us-east-1.amazonaws.com/categories";
+
+const KNOWN_CATEGORY_SLUGS = new Set<string>([
+  "industrial", "buildings-trades", "cosmetology", "cosmetology-state-board",
+  "analyzers", "electrical", "instrumentation", "mechanical", "process-technology",
+  "basic-instrumentation", "calibration", "maintenance", "tube-bending",
+  "compressors", "cooling-towers", "distillation", "process-equipment", "pumps",
+  "valves", "criminal-justice", "computers", "health-science", "hvac",
+  "mobile-equipment", "utility-line-tech", "welding", "anatomy-physiology",
+  "cna", "medical-terminology", "cell-structure", "mapping-the-body",
+  "body-systems", "hvac-basics", "hvac-performance", "duct-system-design",
+  "hvac-components",
+]);
+
+const imageUrlForSlug = (slug: string): string | null =>
+  KNOWN_CATEGORY_SLUGS.has(slug) ? `${S3_BASE}/${slug}.jpg` : null;
 
 interface Category {
   id: number;
@@ -160,6 +177,12 @@ export function AdminCategories() {
     walk(tree);
     return out;
   }, [tree]);
+
+  const categoriesById = useMemo(() => {
+    const map = new Map<number, Category>();
+    categories.forEach((c) => map.set(c.id, c));
+    return map;
+  }, [categories]);
 
   // Compute descendants for a given id (to prevent assigning self/descendant as parent)
   const descendantIds = (id: number): Set<number> => {
@@ -403,6 +426,7 @@ export function AdminCategories() {
               <CategoryRow
                 key={root.id}
                 node={root}
+                categoriesById={categoriesById}
                 onView={(c) => setVideosCategory(c)}
                 onAddChild={(id) => openCreate(id)}
                 onEdit={(c) => openEdit(c)}
@@ -471,21 +495,50 @@ export function AdminCategories() {
 
 interface CategoryRowProps {
   node: CategoryNode;
+  categoriesById: Map<number, Category>;
   onView: (c: CategoryNode) => void;
   onAddChild: (id: number) => void;
   onEdit: (c: CategoryNode) => void;
   onDelete: (c: CategoryNode) => void;
 }
 
-function CategoryRow({ node, onView, onAddChild, onEdit, onDelete }: CategoryRowProps) {
+function CategoryRow({ node, categoriesById, onView, onAddChild, onEdit, onDelete }: CategoryRowProps) {
   const hasChildren = node.children.length > 0;
+
+  // Walk up the tree to find a slug with a known image
+  const thumbUrl = (() => {
+    let cur: Category | undefined = node;
+    while (cur) {
+      const url = imageUrlForSlug(cur.slug);
+      if (url) return url;
+      if (cur.parent_id == null) break;
+      cur = categoriesById.get(cur.parent_id);
+    }
+    return null;
+  })();
+
   return (
     <div>
       <div className="flex items-center justify-between rounded-md border bg-card px-3 py-2 hover:bg-accent/40 transition-colors">
-        <div className="flex items-center gap-2 min-w-0">
+        <div className="flex items-center gap-3 min-w-0">
           {node.depth > 0 && (
             <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
           )}
+          <div className="h-12 w-12 shrink-0 overflow-hidden rounded-md border bg-muted flex items-center justify-center">
+            {thumbUrl ? (
+              <img
+                src={thumbUrl}
+                alt={node.name}
+                loading="lazy"
+                className="h-full w-full object-cover"
+                onError={(e) => {
+                  (e.currentTarget as HTMLImageElement).style.display = "none";
+                }}
+              />
+            ) : (
+              <ImageIcon className="h-5 w-5 text-muted-foreground" />
+            )}
+          </div>
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <button
@@ -535,6 +588,7 @@ function CategoryRow({ node, onView, onAddChild, onEdit, onDelete }: CategoryRow
             <CategoryRow
               key={child.id}
               node={child}
+              categoriesById={categoriesById}
               onView={onView}
               onAddChild={onAddChild}
               onEdit={onEdit}
