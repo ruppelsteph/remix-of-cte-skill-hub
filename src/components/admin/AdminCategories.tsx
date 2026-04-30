@@ -495,21 +495,50 @@ export function AdminCategories() {
 
 interface CategoryRowProps {
   node: CategoryNode;
+  categoriesById: Map<number, Category>;
   onView: (c: CategoryNode) => void;
   onAddChild: (id: number) => void;
   onEdit: (c: CategoryNode) => void;
   onDelete: (c: CategoryNode) => void;
 }
 
-function CategoryRow({ node, onView, onAddChild, onEdit, onDelete }: CategoryRowProps) {
+function CategoryRow({ node, categoriesById, onView, onAddChild, onEdit, onDelete }: CategoryRowProps) {
   const hasChildren = node.children.length > 0;
+
+  // Walk up the tree to find a slug with a known image
+  const thumbUrl = (() => {
+    let cur: Category | undefined = node;
+    while (cur) {
+      const url = imageUrlForSlug(cur.slug);
+      if (url) return url;
+      if (cur.parent_id == null) break;
+      cur = categoriesById.get(cur.parent_id);
+    }
+    return null;
+  })();
+
   return (
     <div>
       <div className="flex items-center justify-between rounded-md border bg-card px-3 py-2 hover:bg-accent/40 transition-colors">
-        <div className="flex items-center gap-2 min-w-0">
+        <div className="flex items-center gap-3 min-w-0">
           {node.depth > 0 && (
             <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
           )}
+          <div className="h-12 w-12 shrink-0 overflow-hidden rounded-md border bg-muted flex items-center justify-center">
+            {thumbUrl ? (
+              <img
+                src={thumbUrl}
+                alt={node.name}
+                loading="lazy"
+                className="h-full w-full object-cover"
+                onError={(e) => {
+                  (e.currentTarget as HTMLImageElement).style.display = "none";
+                }}
+              />
+            ) : (
+              <ImageIcon className="h-5 w-5 text-muted-foreground" />
+            )}
+          </div>
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <button
