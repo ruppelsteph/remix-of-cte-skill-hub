@@ -146,6 +146,61 @@ const Account = () => {
         <div className="container mx-auto px-4">
           <h1 className="text-3xl font-bold text-foreground mb-8">My Account</h1>
 
+          {groupSuccess && (
+            <div className="mb-8 rounded-xl border border-primary/30 bg-primary/5 p-6">
+              <div className="flex items-start gap-4">
+                <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                  <CheckCircle className="h-6 w-6 text-primary" />
+                </div>
+                <div className="flex-1 space-y-3">
+                  <div>
+                    <h3 className="text-lg font-semibold text-foreground">Your class is ready!</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Share the class code or invite link below with your students. Each student creates an
+                      account using the code and gets the same video access you purchased{groupSuccess.seatCount ? ` — up to ${groupSuccess.seatCount} students` : ""}.
+                    </p>
+                  </div>
+                  {groupSuccess.couponCode && (
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      <div className="flex items-center gap-2 px-3 py-2 rounded-md border border-border bg-background font-mono text-sm">
+                        <span className="font-semibold text-primary">{groupSuccess.couponCode}</span>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          navigator.clipboard.writeText(groupSuccess.couponCode!);
+                          toast({ title: "Code copied" });
+                        }}
+                      >
+                        <Copy className="h-4 w-4 mr-2" /> Copy code
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const link = `${window.location.origin}/join/${encodeURIComponent(groupSuccess.couponCode!)}`;
+                          navigator.clipboard.writeText(link);
+                          toast({ title: "Invite link copied", description: "Paste it in an email to your students." });
+                        }}
+                      >
+                        <LinkIcon className="h-4 w-4 mr-2" /> Copy invite link
+                      </Button>
+                    </div>
+                  )}
+                  <div className="flex gap-2 pt-1">
+                    <Button asChild size="sm">
+                      <Link to="/group-admin"><Users className="h-4 w-4 mr-2" /> Manage class</Link>
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => setGroupSuccess(null)}>
+                      Dismiss
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Profile Info */}
             <div className="lg:col-span-2 space-y-6">
