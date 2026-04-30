@@ -588,6 +588,7 @@ function CategoryRow({ node, categoriesById, onView, onAddChild, onEdit, onDelet
             <CategoryRow
               key={child.id}
               node={child}
+              categoriesById={categoriesById}
               onView={onView}
               onAddChild={onAddChild}
               onEdit={onEdit}
