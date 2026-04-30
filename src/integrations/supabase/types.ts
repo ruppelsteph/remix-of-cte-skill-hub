@@ -169,25 +169,40 @@ export type Database = {
       }
       group_purchases: {
         Row: {
+          cancel_at_period_end: boolean
           created_at: string
+          current_period_end: string | null
           group_id: string
           id: string
           product_id: string | null
+          seat_count: number | null
+          status: string
           stripe_session_id: string
+          stripe_subscription_id: string | null
         }
         Insert: {
+          cancel_at_period_end?: boolean
           created_at?: string
+          current_period_end?: string | null
           group_id: string
           id?: string
           product_id?: string | null
+          seat_count?: number | null
+          status?: string
           stripe_session_id: string
+          stripe_subscription_id?: string | null
         }
         Update: {
+          cancel_at_period_end?: boolean
           created_at?: string
+          current_period_end?: string | null
           group_id?: string
           id?: string
           product_id?: string | null
+          seat_count?: number | null
+          status?: string
           stripe_session_id?: string
+          stripe_subscription_id?: string | null
         }
         Relationships: [
           {
