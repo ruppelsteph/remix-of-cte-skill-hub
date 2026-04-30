@@ -332,19 +332,21 @@ export default function Videos() {
                       )}
                     >
                       <div className="relative aspect-[4/3] w-full overflow-hidden bg-muted">
-                        {img ? (
+                        <div className="absolute inset-0 flex items-center justify-center bg-primary/10">
+                          <FolderOpen className="h-12 w-12 text-primary" />
+                        </div>
+                        {img && (
                           <img
                             src={img}
                             alt={cat.name}
                             loading="lazy"
                             width={800}
                             height={600}
-                            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                            onError={(e) => {
+                              (e.currentTarget as HTMLImageElement).style.display = "none";
+                            }}
+                            className="relative h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                           />
-                        ) : (
-                          <div className="flex h-full w-full items-center justify-center bg-primary/10">
-                            <FolderOpen className="h-12 w-12 text-primary" />
-                          </div>
                         )}
                         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
                         <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between">
