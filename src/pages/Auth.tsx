@@ -249,6 +249,15 @@ const Auth = () => {
                 </p>
               )}
             </div>
+
+            {mode === "signup" && (
+              <p className="mt-3 text-center text-xs text-muted-foreground">
+                Joining a class?{" "}
+                <Link to="/join" className="text-primary font-medium hover:underline">
+                  Use a class code instead
+                </Link>
+              </p>
+            )}
               </>
             )}
           </div>
