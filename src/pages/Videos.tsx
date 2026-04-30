@@ -256,8 +256,8 @@ export default function Videos() {
   const imageForCategory = (cat: Category): string | null => {
     let cur: Category | undefined = cat;
     while (cur) {
-      const img = CATEGORY_IMAGE_BY_SLUG[cur.slug];
-      if (img) return img;
+      const url = imageUrlForSlug(cur.slug);
+      if (url) return url;
       if (cur.parent_id == null) break;
       cur = categoriesById.get(cur.parent_id);
     }
