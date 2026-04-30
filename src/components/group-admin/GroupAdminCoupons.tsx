@@ -14,7 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Loader2, RefreshCw, Calendar, Power, Copy } from "lucide-react";
+import { Loader2, RefreshCw, Calendar, Power, Copy, Link as LinkIcon, ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 
@@ -38,16 +38,29 @@ function generateCode(): string {
   return `CLASS-${suffix}`;
 }
 
+interface GroupPurchaseStatus {
+  group_id: string;
+  status: string;
+  current_period_end: string | null;
+  cancel_at_period_end: boolean;
+  seat_count: number | null;
+}
+
 export function GroupAdminCoupons() {
   const { user } = useAuth();
   const [coupons, setCoupons] = useState<Coupon[]>([]);
+  const [purchases, setPurchases] = useState<GroupPurchaseStatus[]>([]);
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [expDialog, setExpDialog] = useState<{ open: boolean; coupon: Coupon | null; value: string }>({
     open: false,
     coupon: null,
     value: "",
   });
+
+  const inviteLinkFor = (code: string) =>
+    `${window.location.origin}/join/${encodeURIComponent(code)}`;
 
   const load = async () => {
     if (!user) return;
@@ -62,27 +75,63 @@ export function GroupAdminCoupons() {
     const groupIds = (memberships ?? []).map((m) => m.group_id);
     if (groupIds.length === 0) {
       setCoupons([]);
+      setPurchases([]);
       setLoading(false);
       return;
     }
 
-    const { data, error } = await supabase
-      .from("group_coupon_codes")
-      .select("*")
-      .in("group_id", groupIds)
-      .order("created_at", { ascending: false });
+    const [{ data: codes, error }, { data: purchaseRows }] = await Promise.all([
+      supabase
+        .from("group_coupon_codes")
+        .select("*")
+        .in("group_id", groupIds)
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("group_purchases")
+        .select("group_id, status, current_period_end, cancel_at_period_end, seat_count")
+        .in("group_id", groupIds)
+        .order("created_at", { ascending: false }),
+    ]);
 
     if (error) {
       toast.error("Failed to load coupons: " + error.message);
     } else {
-      setCoupons(data as Coupon[]);
+      setCoupons((codes ?? []) as Coupon[]);
     }
+    setPurchases((purchaseRows ?? []) as GroupPurchaseStatus[]);
     setLoading(false);
   };
 
   useEffect(() => {
     load();
   }, [user?.id]);
+
+  const syncSubscription = async () => {
+    const groupId = purchases[0]?.group_id ?? coupons[0]?.group_id;
+    if (!groupId) return;
+    setSyncing(true);
+    try {
+      const { error } = await supabase.functions.invoke("sync-group-subscription", {
+        body: { groupId },
+      });
+      if (error) {
+        toast.error("Could not refresh subscription status.");
+      } else {
+        toast.success("Subscription status refreshed.");
+        await load();
+      }
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  // Most-recent purchase summary for the header banner
+  const latestPurchase = purchases[0];
+  const subscriptionExpired =
+    latestPurchase &&
+    (!["active", "trialing"].includes(latestPurchase.status) ||
+      (latestPurchase.current_period_end &&
+        new Date(latestPurchase.current_period_end) < new Date()));
 
   const regenerate = async (coupon: Coupon) => {
     setBusyId(coupon.id);
