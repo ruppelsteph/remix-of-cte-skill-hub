@@ -1,26 +1,22 @@
-## Switch category images to S3 (us-east-1, bucket `cte-email-assets`)
+## Add category images to `public/categories/` for GitHub access
 
-### Step 1 — Export 36 images for you to upload
-Copy `src/assets/category-*.jpg` into `/mnt/documents/categories/` and surface them as artifacts so you can download them and drag-and-drop into the S3 console upload dialog (set Content-Type `image/jpeg` and Cache-Control `public, max-age=31536000, immutable` in the Properties step).
+### Step 1 — Restore the 36 images
+Copy the 36 category images from `/mnt/documents/categories/` (already exported there) into `public/categories/<slug>.jpg`. Filenames will exactly match the S3 keys (e.g. `public/categories/industrial.jpg`, `public/categories/hvac-basics.jpg`).
 
-### Step 2 — Update `src/pages/Videos.tsx`
-- Remove all 36 `import xxxImg from "@/assets/category-*.jpg"` lines.
-- Remove `CATEGORY_IMAGE_BY_SLUG` map.
-- Add:
-  ```ts
-  const S3_BASE = "https://cte-email-assets.s3.us-east-1.amazonaws.com/categories";
-  const KNOWN_CATEGORY_SLUGS = new Set([ /* the 36 slugs */ ]);
-  const imageUrlForSlug = (slug: string) =>
-    KNOWN_CATEGORY_SLUGS.has(slug) ? `${S3_BASE}/${slug}.jpg` : null;
-  ```
-- Update `imageForCategory` to walk the parent chain using `imageUrlForSlug`.
-- Add `onError` handler on `<img>` to hide broken images (the `FolderOpen` icon placeholder remains visible underneath via conditional rendering).
+Files like:
+- `public/categories/industrial.jpg`
+- `public/categories/buildings-trades.jpg`
+- `public/categories/cosmetology.jpg`
+- ... (all 36 slugs from `KNOWN_CATEGORY_SLUGS` in `src/pages/Videos.tsx`)
 
-### Step 3 — Delete local assets
-Delete the 36 `src/assets/category-*.jpg` files to shrink the bundle.
+### Step 2 — No code changes required
+`src/pages/Videos.tsx` already loads images from S3 via `S3_BASE`. The `public/categories/` files are purely a GitHub-accessible mirror for you to download and bulk-upload to S3. They are not bundled by Vite (the `public/` folder is served as-is and only fetched if referenced).
 
-### Fallback
-If S3 returns 403/CORS or a slug has no image uploaded yet, the `onError` handler hides the `<img>` and the existing `FolderOpen` placeholder shows — no broken layout.
+### Step 3 — How you'll use them
+Once synced to GitHub, you can:
+- Browse to `public/categories/` in your repo and download individual files, or
+- `git clone` the repo and drag the entire `public/categories/` folder into the S3 console upload dialog (set Content-Type `image/jpeg` and Cache-Control `public, max-age=31536000, immutable` in the Properties step).
 
-### After approval
-Switch to default mode and apply.
+### Notes
+- Slight bundle/repo size increase (~36 jpgs in `public/`) but zero JS bundle impact.
+- If you later decide you don't want them in the repo after S3 is populated, we can delete `public/categories/` in one step.
