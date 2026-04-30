@@ -34,7 +34,7 @@ const About = () => {
           <h1 className="text-4xl md:text-5xl font-bold text-secondary-foreground mb-4">
             About CTE Skills
           </h1>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+          <p className="text-lg max-w-2xl mx-auto text-secondary-foreground">
             Empowering the next generation of skilled professionals through high-quality 
             career and technical education video content.
           </p>
