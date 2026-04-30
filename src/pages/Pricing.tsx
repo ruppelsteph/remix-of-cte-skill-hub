@@ -132,7 +132,7 @@ const Pricing = () => {
           <h1 className="text-4xl md:text-5xl font-bold text-secondary-foreground mb-4">
             Simple, Transparent Pricing
           </h1>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+          <p className="text-lg max-w-2xl mx-auto text-secondary-foreground">
             Choose the plan that works best for you. Full access to all CTE pathways and training videos.
           </p>
         </div>

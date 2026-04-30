@@ -31,7 +31,7 @@ const Pathways = () => {
           <h1 className="text-4xl md:text-5xl font-bold text-secondary-foreground mb-4">
             CTE Pathways
           </h1>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+          <p className="text-lg max-w-2xl mx-auto text-secondary-foreground">
             Explore career and technical education pathways. Each pathway contains curated video content 
             aligned with industry standards and real-world skills.
           </p>
