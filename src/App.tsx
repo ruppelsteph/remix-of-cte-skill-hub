@@ -17,6 +17,7 @@ import ResetPassword from "./pages/ResetPassword";
 import Account from "./pages/Account";
 import Admin from "./pages/Admin";
 import GroupAdmin from "./pages/GroupAdmin";
+import Join from "./pages/Join";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -42,6 +43,8 @@ const App = () => (
             <Route path="/account" element={<Account />} />
             <Route path="/admin" element={<Admin />} />
             <Route path="/group-admin" element={<GroupAdmin />} />
+            <Route path="/join" element={<Join />} />
+            <Route path="/join/:code" element={<Join />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

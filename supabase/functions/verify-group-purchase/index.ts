@@ -1,5 +1,4 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import Stripe from "https://esm.sh/stripe@14.21.0?target=deno";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0?target=deno";
 
 const corsHeaders = {
@@ -11,6 +10,32 @@ const logStep = (step: string, details?: Record<string, unknown>) => {
   const detailsStr = details ? ` - ${JSON.stringify(details)}` : "";
   console.log(`[VERIFY-GROUP-PURCHASE] ${step}${detailsStr}`);
 };
+
+// Stripe REST API helpers (no SDK — per project memory)
+const STRIPE_BASE = "https://api.stripe.com/v1";
+
+async function stripeGet(path: string, key: string, query?: Record<string, string>): Promise<any> {
+  const qs = query ? "?" + new URLSearchParams(query).toString() : "";
+  const res = await fetch(`${STRIPE_BASE}${path}${qs}`, {
+    headers: { Authorization: `Bearer ${key}` },
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Stripe ${path} failed: ${res.status} ${text}`);
+  }
+  return res.json();
+}
+
+function epochToISO(value: unknown): string | null {
+  const n = typeof value === "string" ? Number(value) : (value as number);
+  if (!Number.isFinite(n)) return null;
+  let ms: number;
+  if (n < 1e11) ms = n * 1000;
+  else if (n < 1e14) ms = n;
+  else ms = Math.floor(n / 1000);
+  const d = new Date(ms);
+  return Number.isNaN(d.getTime()) ? null : d.toISOString();
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -29,6 +54,8 @@ serve(async (req) => {
 
   try {
     logStep("Function started");
+    const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
+    if (!stripeKey) throw new Error("STRIPE_SECRET_KEY is not set");
 
     const { sessionId } = await req.json();
     if (!sessionId) throw new Error("sessionId is required");
@@ -42,11 +69,12 @@ serve(async (req) => {
     if (!user?.email) throw new Error("User not authenticated");
     logStep("User authenticated", { userId: user.id });
 
-    const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
-      apiVersion: "2025-08-27.basil",
-    });
-
-    const session = await stripe.checkout.sessions.retrieve(sessionId);
+    // Retrieve checkout session with subscription expanded
+    const session = await stripeGet(
+      `/checkout/sessions/${sessionId}`,
+      stripeKey,
+      { "expand[]": "subscription" },
+    );
     logStep("Session retrieved", {
       paymentStatus: session.payment_status,
       status: session.status,
@@ -67,7 +95,18 @@ serve(async (req) => {
       : 25;
     if (!groupId) throw new Error("Session metadata missing group_id");
 
-    // Verify caller is group_admin of this group (or site admin) — defense in depth
+    // Subscription details from the session
+    const subscription = session.subscription;
+    const subscriptionId = typeof subscription === "string" ? subscription : subscription?.id ?? null;
+    const subStatus = typeof subscription === "object" ? subscription?.status ?? "active" : "active";
+    const periodEnd = typeof subscription === "object"
+      ? epochToISO(subscription?.current_period_end)
+      : null;
+    const cancelAtPeriodEnd = typeof subscription === "object"
+      ? !!subscription?.cancel_at_period_end
+      : false;
+
+    // Verify caller is group_admin of this group (or site admin)
     const { data: membership } = await supabaseAdmin
       .from("group_members")
       .select("role")
@@ -93,16 +132,34 @@ serve(async (req) => {
         group_id: groupId,
         stripe_session_id: sessionId,
         product_id: productId,
+        stripe_subscription_id: subscriptionId,
+        status: subStatus,
+        current_period_end: periodEnd,
+        cancel_at_period_end: cancelAtPeriodEnd,
+        seat_count: seatCount,
       }]);
 
     const purchaseAlreadyExisted = insertErr?.code === "23505";
     if (insertErr && !purchaseAlreadyExisted) {
       throw new Error(`Failed to record purchase: ${insertErr.message}`);
     }
-    logStep("Group purchase recorded", { groupId, sessionId, alreadyExisted: purchaseAlreadyExisted });
+
+    // If it already existed, refresh subscription state in case it changed
+    if (purchaseAlreadyExisted && subscriptionId) {
+      await supabaseAdmin
+        .from("group_purchases")
+        .update({
+          stripe_subscription_id: subscriptionId,
+          status: subStatus,
+          current_period_end: periodEnd,
+          cancel_at_period_end: cancelAtPeriodEnd,
+          seat_count: seatCount,
+        })
+        .eq("stripe_session_id", sessionId);
+    }
+    logStep("Group purchase recorded", { groupId, sessionId, subscriptionId, periodEnd });
 
     // Generate a coupon code tied to this purchase (one per session, idempotent).
-    // Format: CLASS-XXXXXX (6 chars, no ambiguous 0/O/1/I).
     const ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
     const generateCode = () => {
       let s = "CLASS-";
@@ -115,8 +172,6 @@ serve(async (req) => {
     let couponCode: string | null = null;
     let couponId: string | null = null;
 
-    // Only auto-generate if no code yet exists for this purchase context.
-    // Heuristic: skip generation when the session was already recorded earlier.
     if (!purchaseAlreadyExisted) {
       for (let attempt = 0; attempt < 5; attempt++) {
         const candidate = generateCode();
@@ -138,10 +193,23 @@ serve(async (req) => {
           break;
         }
         if (codeErr && codeErr.code !== "23505") {
-          // Non-collision error: log and stop trying.
           logStep("Coupon insert error", { message: codeErr.message });
           break;
         }
+      }
+    } else {
+      // Look up an existing code for this group so the success page can show it.
+      const { data: existingCode } = await supabaseAdmin
+        .from("group_coupon_codes")
+        .select("id, code")
+        .eq("group_id", groupId)
+        .eq("is_active", true)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (existingCode) {
+        couponCode = existingCode.code;
+        couponId = existingCode.id;
       }
     }
 
@@ -153,6 +221,8 @@ serve(async (req) => {
         couponCode,
         couponId,
         seatCount,
+        currentPeriodEnd: periodEnd,
+        subscriptionStatus: subStatus,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 },
     );

@@ -14,7 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Loader2, RefreshCw, Calendar, Power, Copy } from "lucide-react";
+import { Loader2, RefreshCw, Calendar, Power, Copy, Link as LinkIcon, ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 
@@ -38,16 +38,29 @@ function generateCode(): string {
   return `CLASS-${suffix}`;
 }
 
+interface GroupPurchaseStatus {
+  group_id: string;
+  status: string;
+  current_period_end: string | null;
+  cancel_at_period_end: boolean;
+  seat_count: number | null;
+}
+
 export function GroupAdminCoupons() {
   const { user } = useAuth();
   const [coupons, setCoupons] = useState<Coupon[]>([]);
+  const [purchases, setPurchases] = useState<GroupPurchaseStatus[]>([]);
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [expDialog, setExpDialog] = useState<{ open: boolean; coupon: Coupon | null; value: string }>({
     open: false,
     coupon: null,
     value: "",
   });
+
+  const inviteLinkFor = (code: string) =>
+    `${window.location.origin}/join/${encodeURIComponent(code)}`;
 
   const load = async () => {
     if (!user) return;
@@ -62,27 +75,63 @@ export function GroupAdminCoupons() {
     const groupIds = (memberships ?? []).map((m) => m.group_id);
     if (groupIds.length === 0) {
       setCoupons([]);
+      setPurchases([]);
       setLoading(false);
       return;
     }
 
-    const { data, error } = await supabase
-      .from("group_coupon_codes")
-      .select("*")
-      .in("group_id", groupIds)
-      .order("created_at", { ascending: false });
+    const [{ data: codes, error }, { data: purchaseRows }] = await Promise.all([
+      supabase
+        .from("group_coupon_codes")
+        .select("*")
+        .in("group_id", groupIds)
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("group_purchases")
+        .select("group_id, status, current_period_end, cancel_at_period_end, seat_count")
+        .in("group_id", groupIds)
+        .order("created_at", { ascending: false }),
+    ]);
 
     if (error) {
       toast.error("Failed to load coupons: " + error.message);
     } else {
-      setCoupons(data as Coupon[]);
+      setCoupons((codes ?? []) as Coupon[]);
     }
+    setPurchases((purchaseRows ?? []) as GroupPurchaseStatus[]);
     setLoading(false);
   };
 
   useEffect(() => {
     load();
   }, [user?.id]);
+
+  const syncSubscription = async () => {
+    const groupId = purchases[0]?.group_id ?? coupons[0]?.group_id;
+    if (!groupId) return;
+    setSyncing(true);
+    try {
+      const { error } = await supabase.functions.invoke("sync-group-subscription", {
+        body: { groupId },
+      });
+      if (error) {
+        toast.error("Could not refresh subscription status.");
+      } else {
+        toast.success("Subscription status refreshed.");
+        await load();
+      }
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  // Most-recent purchase summary for the header banner
+  const latestPurchase = purchases[0];
+  const subscriptionExpired =
+    latestPurchase &&
+    (!["active", "trialing"].includes(latestPurchase.status) ||
+      (latestPurchase.current_period_end &&
+        new Date(latestPurchase.current_period_end) < new Date()));
 
   const regenerate = async (coupon: Coupon) => {
     setBusyId(coupon.id);
@@ -168,6 +217,11 @@ export function GroupAdminCoupons() {
     toast.success("Code copied");
   };
 
+  const copyInviteLink = (code: string) => {
+    navigator.clipboard.writeText(inviteLinkFor(code));
+    toast.success("Invite link copied — paste it in an email to your students.");
+  };
+
   if (loading) {
     return (
       <Card>
@@ -180,17 +234,60 @@ export function GroupAdminCoupons() {
 
   return (
     <>
+      {latestPurchase && (
+        <Card className="mb-6">
+          <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                Group subscription
+                {subscriptionExpired ? (
+                  <Badge variant="destructive">Inactive</Badge>
+                ) : latestPurchase.cancel_at_period_end ? (
+                  <Badge variant="secondary">Ending soon</Badge>
+                ) : (
+                  <Badge>Active</Badge>
+                )}
+              </CardTitle>
+              <CardDescription>
+                {subscriptionExpired
+                  ? "Students currently can't access videos through this group. Renew the subscription to restore access."
+                  : latestPurchase.current_period_end
+                    ? `Students keep access until ${format(new Date(latestPurchase.current_period_end), "MMMM d, yyyy")}.`
+                    : "Students have access while your subscription stays active."}
+                {latestPurchase.seat_count != null && ` Up to ${latestPurchase.seat_count} student seat${latestPurchase.seat_count === 1 ? "" : "s"} available.`}
+              </CardDescription>
+            </div>
+            <Button variant="outline" size="sm" onClick={syncSubscription} disabled={syncing}>
+              {syncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+              <span className="ml-2">Refresh</span>
+            </Button>
+          </CardHeader>
+          {subscriptionExpired && (
+            <CardContent>
+              <div className="flex items-start gap-2 text-sm text-destructive">
+                <ShieldAlert className="h-4 w-4 mt-0.5" />
+                <span>
+                  Your group subscription has lapsed. Visit your account to renew, then refresh here.
+                </span>
+              </div>
+            </CardContent>
+          )}
+        </Card>
+      )}
+
       <Card>
         <CardHeader>
-          <CardTitle>Coupon Codes</CardTitle>
+          <CardTitle>Class codes & invite links</CardTitle>
           <CardDescription>
-            Manage codes that students use to enroll in your group. Codes are tied to seat counts from your group purchase.
+            Share these with your students. Each redemption uses one seat. Once a student signs up
+            with the code, they automatically get the same access you purchased for as long as your
+            group subscription stays active.
           </CardDescription>
         </CardHeader>
         <CardContent>
           {coupons.length === 0 ? (
             <p className="text-center text-muted-foreground py-8">
-              No coupon codes yet. Codes are generated automatically after a successful group purchase.
+              No class codes yet. A code is generated automatically after a successful group purchase.
             </p>
           ) : (
             <div className="rounded-md border">
@@ -246,6 +343,14 @@ export function GroupAdminCoupons() {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-1">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => copyInviteLink(c.code)}
+                              title="Copy invite link to share with students"
+                            >
+                              <LinkIcon className="h-4 w-4" />
+                            </Button>
                             <Button
                               size="sm"
                               variant="ghost"

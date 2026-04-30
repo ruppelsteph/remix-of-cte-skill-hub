@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { User, CreditCard, CheckCircle, XCircle, ArrowRight, Settings, Loader2, RefreshCw } from "lucide-react";
+import { User, CreditCard, CheckCircle, XCircle, ArrowRight, Settings, Loader2, RefreshCw, Copy, Link as LinkIcon, Users } from "lucide-react";
 import { format } from "date-fns";
 
 const Account = () => {
@@ -15,6 +15,10 @@ const Account = () => {
   const { toast } = useToast();
   const hasHandledSuccess = useRef(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [groupSuccess, setGroupSuccess] = useState<{
+    couponCode: string | null;
+    seatCount: number | null;
+  } | null>(null);
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -62,10 +66,11 @@ const Account = () => {
             seatCount = data?.seatCount ?? null;
           }
           await supabase.functions.invoke("sync-subscription").catch(() => {});
+          setGroupSuccess({ couponCode, seatCount });
           toast({
             title: "Group purchase successful!",
             description: couponCode
-              ? `Your coupon code is ${couponCode}${seatCount ? ` (${seatCount} seats)` : ""}.`
+              ? `Your class code ${couponCode} is ready to share.`
               : "Your group is set up and ready to go.",
           });
           await refreshSubscription();
@@ -140,6 +145,61 @@ const Account = () => {
       <div className="py-12 lg:py-20">
         <div className="container mx-auto px-4">
           <h1 className="text-3xl font-bold text-foreground mb-8">My Account</h1>
+
+          {groupSuccess && (
+            <div className="mb-8 rounded-xl border border-primary/30 bg-primary/5 p-6">
+              <div className="flex items-start gap-4">
+                <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                  <CheckCircle className="h-6 w-6 text-primary" />
+                </div>
+                <div className="flex-1 space-y-3">
+                  <div>
+                    <h3 className="text-lg font-semibold text-foreground">Your class is ready!</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Share the class code or invite link below with your students. Each student creates an
+                      account using the code and gets the same video access you purchased{groupSuccess.seatCount ? ` — up to ${groupSuccess.seatCount} students` : ""}.
+                    </p>
+                  </div>
+                  {groupSuccess.couponCode && (
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      <div className="flex items-center gap-2 px-3 py-2 rounded-md border border-border bg-background font-mono text-sm">
+                        <span className="font-semibold text-primary">{groupSuccess.couponCode}</span>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          navigator.clipboard.writeText(groupSuccess.couponCode!);
+                          toast({ title: "Code copied" });
+                        }}
+                      >
+                        <Copy className="h-4 w-4 mr-2" /> Copy code
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const link = `${window.location.origin}/join/${encodeURIComponent(groupSuccess.couponCode!)}`;
+                          navigator.clipboard.writeText(link);
+                          toast({ title: "Invite link copied", description: "Paste it in an email to your students." });
+                        }}
+                      >
+                        <LinkIcon className="h-4 w-4 mr-2" /> Copy invite link
+                      </Button>
+                    </div>
+                  )}
+                  <div className="flex gap-2 pt-1">
+                    <Button asChild size="sm">
+                      <Link to="/group-admin"><Users className="h-4 w-4 mr-2" /> Manage class</Link>
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => setGroupSuccess(null)}>
+                      Dismiss
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Profile Info */}
