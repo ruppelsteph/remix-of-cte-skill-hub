@@ -24,7 +24,24 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, Plus, Pencil, Trash2, FolderTree, ChevronRight } from "lucide-react";
+import { Loader2, Plus, Pencil, Trash2, FolderTree, ChevronRight, ImageIcon } from "lucide-react";
+
+const S3_BASE = "https://cte-email-assets.s3.us-east-1.amazonaws.com/categories";
+
+const KNOWN_CATEGORY_SLUGS = new Set<string>([
+  "industrial", "buildings-trades", "cosmetology", "cosmetology-state-board",
+  "analyzers", "electrical", "instrumentation", "mechanical", "process-technology",
+  "basic-instrumentation", "calibration", "maintenance", "tube-bending",
+  "compressors", "cooling-towers", "distillation", "process-equipment", "pumps",
+  "valves", "criminal-justice", "computers", "health-science", "hvac",
+  "mobile-equipment", "utility-line-tech", "welding", "anatomy-physiology",
+  "cna", "medical-terminology", "cell-structure", "mapping-the-body",
+  "body-systems", "hvac-basics", "hvac-performance", "duct-system-design",
+  "hvac-components",
+]);
+
+const imageUrlForSlug = (slug: string): string | null =>
+  KNOWN_CATEGORY_SLUGS.has(slug) ? `${S3_BASE}/${slug}.jpg` : null;
 
 interface Category {
   id: number;
