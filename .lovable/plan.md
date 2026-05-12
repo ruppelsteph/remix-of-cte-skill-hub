@@ -1,66 +1,106 @@
+# Improve the Subscription Entitlements admin UX
 
-# Goal
+Replace the raw "paste a price ID" form with a Stripe-aware picker, and add a one-screen bulk sync so all 20 new category prices can be mapped in a single sitting.
 
-Let users buy a subscription that unlocks **all videos** (existing) **or** a single **top-level category** (new), monthly or annual. Group purchases get the same option.
+## 1. New edge function: `list-stripe-prices`
 
-The data model already supports this — `subscription_entitlements` has `access_type='category'` and a `category_id` column, and `user_has_video_access` already expands ancestors and matches category entitlements. So this is mostly: (1) seed entitlements for the new Stripe prices, (2) update the Pricing page UI, (3) make sure `check-subscription` and group checkout pass the chosen price through.
+Admin-only (verifies JWT + `has_role(uid, 'admin')`). Calls Stripe REST `GET /v1/prices?expand[]=data.product&active=true&limit=100` (paginates with `starting_after` if needed) using `fetch` per project memory — no Stripe SDK.
 
-# 1. Seed `subscription_entitlements` for the new category prices
-
-For each top-level category (Buildings & Trades, Computers, Cosmetology, Criminal Justice, Health Science, HVAC, Industrial, Mobile Equipment, Utility Line Technician, Welding) you've created Monthly + Annual Stripe products. We need the **price IDs** for each. Two options:
-
-- **A.** You paste the 20 price IDs (10 categories × monthly/annual) and I insert them via migration.
-- **B.** I add an **Admin → Entitlements** page that lists every Stripe price the project knows about and lets an admin map each to: `audience` (individual / group / both), `billing_interval`, `access_type` (full / category), and `category_id`. This is reusable forever and avoids hardcoding.
-
-Recommend **B** plus a one-time helper to bulk-import. Each row inserted will have `audience='individual'` AND a parallel `audience='group'` row (same price, same category) so the same Stripe price works for individual and group purchases — matching how the existing all-access prices are seeded.
-
-# 2. Pricing page (`src/pages/Pricing.tsx`)
-
-Restructure into two sections:
-
-- **All-Access** — current Monthly / Annual / School cards, unchanged.
-- **Single-Category Plans** — a new section with a category picker (dropdown or grid of 10 cards). When a category is selected, show Monthly and Annual buttons that call `create-checkout` with that category's price ID. Same UX for the "Buy for a Group" dialog: add a "Plan scope" select (All categories / specific category) before the Monthly/Annual select.
-
-The `PRICE_IDS` const becomes a structured map:
-
+Returns a slim payload:
 ```ts
-const PRICE_IDS = {
-  full:    { monthly: "price_…", annual: "price_…" },
-  byCategory: {
-    [categoryId]: { monthly: "price_…", annual: "price_…" },
-    …
-  }
+{
+  prices: Array<{
+    price_id: string;
+    product_id: string;
+    product_name: string;
+    product_description: string | null;
+    nickname: string | null;
+    unit_amount: number | null;     // cents
+    currency: string;
+    interval: 'month' | 'year' | null;
+    metadata: Record<string, string>;
+  }>
 }
 ```
 
-This map is hydrated at build time from the Admin entitlements (or hardcoded if we go with option A). The page fetches `categories` (parent_id IS NULL) to render names/slugs.
+Cached client-side for the session; a "Refresh from Stripe" button refetches.
 
-# 3. Checkout edge functions
+## 2. Single-row dialog: Stripe-aware picker
 
-- `create-checkout` (individual): already accepts an arbitrary `priceId` — no change needed.
-- `create-group-checkout`: already accepts `priceId` — verify it forwards correctly and that `verify-group-purchase` records the chosen `priceId` into `group_purchases.product_id` (the column `user_has_video_access` joins on). If not, fix that mapping so category group purchases resolve correctly.
+In `AdminEntitlements.tsx`, replace the "Stripe price ID" `Input` with a searchable combobox (shadcn `Command` inside `Popover`) grouped by product:
 
-# 4. Access resolution
+```
+Welding
+  ├─ Monthly · $9.99/mo            ✓ mapped
+  └─ Annual  · $99.99/yr
+HVAC
+  ├─ Monthly · $9.99/mo
+  └─ Annual  · $99.99/yr
+All-Access
+  ├─ Monthly · $49.99/mo            ✓ mapped
+  └─ Annual  · $479.99/yr           ✓ mapped
+```
 
-`user_has_video_access` already handles category entitlements (full vs category, recursive ancestor check). No DB function changes required once entitlements are seeded.
+On select, auto-fill (and lock with an "edit override" toggle):
+- `billing_interval` ← `interval`
+- `unit_amount` ← `unit_amount`
+- `currency` ← `currency`
+- `label` ← `nickname || product_name`
 
-# 5. UI surfaces that show subscription status
+The admin only chooses:
+- **Access type** — Full library / Single category
+- **Category** (if category) — pre-selected when `product.metadata.category_id` exists or product name fuzzy-matches a top-level category name
+- **Audience** — Individual & Group (default) / Individual / Group
 
-- **Account page** — display subscription's product name + scope ("All categories" or the category name). Pull from joined `subscription_entitlements` + `categories`.
-- **VideoCard / VideoDetail** — current logic uses `user_has_video_access` RPC, which already returns the right answer per video. No change beyond confirming the upgrade CTA copy ("Subscribe to unlock Welding videos").
+A "Enter price ID manually" fallback link preserves the current flow if Stripe is unreachable.
 
-# 6. `check-subscription` edge function
+## 3. Bulk "Sync from Stripe" mapper
 
-Already syncs the active Stripe subscription's `price_id` into `public.subscriptions`. As long as the new category prices have entitlement rows, access will resolve correctly. No code change required.
+A new top-of-table button **Sync from Stripe** opens a full-screen `Dialog` (or `Sheet`) showing every active Stripe price as a row:
 
-# Open questions
+```
+[ ✓ ] Welding — Monthly      $9.99/mo   [Access ▾] [Category ▾] [Audience ▾]   ✓ mapped
+[ ✓ ] Welding — Annual       $99.99/yr  [Access ▾] [Category ▾] [Audience ▾]
+[   ] HVAC — Monthly         $9.99/mo   [Access ▾] [Category ▾] [Audience ▾]
+…
+```
 
-1. **Option A vs B above** — admin UI, or paste price IDs once?
-2. **Pricing display** — what are the per-category monthly/annual prices? Same $49.99 / $39.99 as all-access, or cheaper? Needed for the cards.
-3. Should the all-access plan visually be marketed as the "best value" upgrade from a single category, with a simple comparison? (Recommend yes — small comparison strip under the category section.)
+Behavior:
+- Already-mapped prices are pre-checked and dimmed (read-only) with a "✓ mapped" badge.
+- Unmapped prices are unchecked by default; checking one enables its row controls.
+- **Smart defaults** for unmapped rows:
+  - `access_type` = `category` if product name matches a top-level category, else `full`
+  - `category_id` = best name match (or `product.metadata.category_id` if Stripe metadata is set)
+  - `audience` = both (mirrored)
+  - `billing_interval` / `unit_amount` / `currency` / `label` come from Stripe
+- **Bulk action bar** at the top: "Set audience for all" / "Set access type for all" to fast-fill obvious cases.
+- **Save all** does a single `upsert` on `subscription_entitlements` with `onConflict: 'stripe_price_id,audience'`. For mirrored audience, two rows per price are written.
+- Toast summary: "Mapped 18 new prices. 2 unchanged."
 
-# Out of scope
+## 4. Table cosmetic polish
 
-- Refactoring `pathways` (already deprecated per project memory).
-- Webhook-driven subscription sync.
-- Prorated upgrades from category → all-access (Stripe Customer Portal handles this manually for now).
+- Show **product name** as the primary cell, with the `price_…` ID demoted to a small monospace subtitle.
+- Add a "Stale" badge if a row's `stripe_price_id` is no longer returned by Stripe (`active: false` or deleted).
+- Tooltip on the price ID showing "Open in Stripe" deep link (`https://dashboard.stripe.com/prices/{id}`).
+
+## 5. Optional: stamp `category_id` into Stripe metadata
+
+When a category mapping is saved (single or bulk), the edge function can `POST /v1/products/{id}` with `metadata[category_id]={id}`. Future re-imports then auto-map without guessing. Behind a checkbox in the bulk dialog: "Also write category to Stripe product metadata".
+
+## Technical details
+
+**Files**
+- New: `supabase/functions/list-stripe-prices/index.ts` — Deno fetch to Stripe REST, JWT + admin check, paginated.
+- New: `src/components/admin/StripePriceCombobox.tsx` — reusable picker (shadcn Command/Popover).
+- New: `src/components/admin/AdminEntitlementsBulkSync.tsx` — full bulk mapper dialog.
+- Edited: `src/components/admin/AdminEntitlements.tsx` — wire combobox into existing dialog, add "Sync from Stripe" button, show product name, stale badge.
+
+**No DB migrations required.** Existing `subscription_entitlements` schema (with `unit_amount`, `currency`, `label`, unique `(stripe_price_id, audience)`) already supports everything.
+
+**No changes to** `create-checkout`, `create-group-checkout`, `verify-group-purchase`, or `user_has_video_access` — they continue to read entitlements unchanged.
+
+## Out of scope
+
+- Editing prices/products in Stripe from the admin (read-only except the optional metadata write).
+- Webhook-driven sync. Refresh remains manual via the button.
+- Auto-archiving entitlements when a Stripe price becomes inactive (we just badge them "Stale").
