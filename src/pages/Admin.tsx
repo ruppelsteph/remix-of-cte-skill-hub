@@ -3,13 +3,14 @@ import { useNavigate } from "react-router-dom";
 import { Layout } from "@/components/layout/Layout";
 import { useAuth } from "@/contexts/AuthContext";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, Users, Video, FolderOpen, CreditCard, UserCog, Repeat } from "lucide-react";
+import { Loader2, Users, Video, FolderOpen, CreditCard, UserCog, Repeat, Tag } from "lucide-react";
 import { AdminCustomers } from "@/components/admin/AdminCustomers";
 import { AdminVideos } from "@/components/admin/AdminVideos";
 import { AdminCategories } from "@/components/admin/AdminCategories";
 import { AdminOrders } from "@/components/admin/AdminOrders";
 import { AdminUsers } from "@/components/admin/AdminUsers";
 import { AdminSubscriptions } from "@/components/admin/AdminSubscriptions";
+import { AdminEntitlements } from "@/components/admin/AdminEntitlements";
 
 const Admin = () => {
   const { user, isLoading, isAdmin } = useAuth();
@@ -50,7 +51,7 @@ const Admin = () => {
           </div>
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-3 lg:grid-cols-6 lg:w-auto lg:inline-flex mb-6">
+            <TabsList className="grid w-full grid-cols-3 lg:grid-cols-7 lg:w-auto lg:inline-flex mb-6">
               <TabsTrigger value="users" className="flex items-center gap-2">
                 <UserCog className="h-4 w-4" />
                 <span className="hidden sm:inline">Users</span>
@@ -58,6 +59,10 @@ const Admin = () => {
               <TabsTrigger value="subscriptions" className="flex items-center gap-2">
                 <Repeat className="h-4 w-4" />
                 <span className="hidden sm:inline">Subscriptions</span>
+              </TabsTrigger>
+              <TabsTrigger value="entitlements" className="flex items-center gap-2">
+                <Tag className="h-4 w-4" />
+                <span className="hidden sm:inline">Entitlements</span>
               </TabsTrigger>
               <TabsTrigger value="customers" className="flex items-center gap-2">
                 <Users className="h-4 w-4" />
@@ -83,6 +88,10 @@ const Admin = () => {
 
             <TabsContent value="subscriptions">
               <AdminSubscriptions />
+            </TabsContent>
+
+            <TabsContent value="entitlements">
+              <AdminEntitlements />
             </TabsContent>
 
             <TabsContent value="customers">

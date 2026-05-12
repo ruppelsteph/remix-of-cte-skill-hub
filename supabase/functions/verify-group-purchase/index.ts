@@ -69,11 +69,14 @@ serve(async (req) => {
     if (!user?.email) throw new Error("User not authenticated");
     logStep("User authenticated", { userId: user.id });
 
-    // Retrieve checkout session with subscription expanded
+    // Retrieve checkout session with subscription + line items expanded
     const session = await stripeGet(
       `/checkout/sessions/${sessionId}`,
       stripeKey,
-      { "expand[]": "subscription" },
+      {
+        "expand[]": "subscription",
+        "expand[1]": "line_items.data.price",
+      },
     );
     logStep("Session retrieved", {
       paymentStatus: session.payment_status,
@@ -88,7 +91,14 @@ serve(async (req) => {
     }
 
     const groupId = session.metadata?.group_id;
-    const productId = session.metadata?.product_id ?? null;
+    // Prefer the price id (entitlements join on stripe_price_id). Fall back
+    // to metadata for older sessions.
+    const linePrice = session.line_items?.data?.[0]?.price;
+    const priceId =
+      (typeof linePrice === "object" ? linePrice?.id : null) ??
+      session.metadata?.price_id ??
+      session.metadata?.product_id ??
+      null;
     const seatCountRaw = Number(session.metadata?.seat_count);
     const seatCount = Number.isFinite(seatCountRaw) && seatCountRaw > 0
       ? Math.min(Math.floor(seatCountRaw), 1000)
@@ -131,7 +141,7 @@ serve(async (req) => {
       .insert([{
         group_id: groupId,
         stripe_session_id: sessionId,
-        product_id: productId,
+        product_id: priceId,
         stripe_subscription_id: subscriptionId,
         status: subStatus,
         current_period_end: periodEnd,
@@ -217,7 +227,7 @@ serve(async (req) => {
       JSON.stringify({
         recorded: true,
         groupId,
-        productId,
+        priceId,
         couponCode,
         couponId,
         seatCount,

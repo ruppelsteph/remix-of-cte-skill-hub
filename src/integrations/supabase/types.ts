@@ -376,8 +376,11 @@ export type Database = {
           billing_interval: string
           category_id: number | null
           created_at: string
+          currency: string | null
           id: string
+          label: string | null
           stripe_price_id: string
+          unit_amount: number | null
         }
         Insert: {
           access_type: string
@@ -385,8 +388,11 @@ export type Database = {
           billing_interval: string
           category_id?: number | null
           created_at?: string
+          currency?: string | null
           id?: string
+          label?: string | null
           stripe_price_id: string
+          unit_amount?: number | null
         }
         Update: {
           access_type?: string
@@ -394,8 +400,11 @@ export type Database = {
           billing_interval?: string
           category_id?: number | null
           created_at?: string
+          currency?: string | null
           id?: string
+          label?: string | null
           stripe_price_id?: string
+          unit_amount?: number | null
         }
         Relationships: [
           {
