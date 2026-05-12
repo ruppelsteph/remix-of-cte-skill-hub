@@ -235,7 +235,7 @@ const Pricing = () => {
             Simple, Transparent Pricing
           </h1>
           <p className="text-lg max-w-2xl mx-auto text-secondary-foreground">
-            Subscribe to the full CTE Skills library, or just the pathway you need.
+            Subscribe to the full CTE Skills library, or just the category you need.
           </p>
         </div>
       </section>
@@ -328,7 +328,7 @@ const Pricing = () => {
               <Layers className="h-10 w-10 text-primary mx-auto mb-3" />
               <h2 className="text-3xl font-bold text-foreground">Single-Category Plans</h2>
               <p className="text-muted-foreground mt-2 max-w-2xl mx-auto">
-                Just need one pathway? Subscribe to a single category and unlock every video in it.
+                Just need one category? Subscribe to a single category and unlock every video in it.
               </p>
             </div>
 
@@ -405,7 +405,7 @@ const Pricing = () => {
               <a href="#top" onClick={(e) => { e.preventDefault(); window.scrollTo({ top: 0, behavior: "smooth" }); }} className="text-primary underline">
                 See the all-access plans
               </a>{" "}
-              for the best value across all pathways.
+              for the best value across all categories.
             </p>
           </div>
         </section>
