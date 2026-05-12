@@ -1,110 +1,49 @@
-## Goal
+# Why you're seeing the full video
 
-Let a teacher / group admin buy a subscription for N students online. After payment they get a class coupon code (shareable link) that students redeem to create accounts. Each student inherits the same video/category access as the group's purchase, for as long as the group's subscription is active.
+Your account (`ruppelpublishing@gmail.com`) is **not** an admin. The reason you have access is a **stale row** in `public.subscriptions`:
 
-## What's already working
+- Stripe (source of truth) returns **0 subscriptions** for your customer (`cus_TkwlZNU0You1VA`) — see the latest `check-subscription` logs: `"No active or trialing subscription found"`.
+- But `public.subscriptions` still has a row for you with `status='active'`, `price_id=price_1SAaic4McSnLev84NI7X3yoJ`, `current_period_end=NULL`, last updated 2026-01-09.
+- That price has a `subscription_entitlements` row with `audience='individual'`, `access_type='full'`.
+- The DB function `user_has_video_access` checks the local `subscriptions` table (not Stripe), sees `status IN ('active','trialing')` with a `full` entitlement, and returns `true`.
+- RLS policy `View full sources with access` then exposes the Vimeo source on `video_sources`, so the player loads the full video instead of the YouTube preview.
 
-- `groups`, `group_members`, `group_purchases`, `group_coupon_codes`, `group_coupon_redemptions` tables with RLS.
-- Edge functions: `create-group-checkout`, `verify-group-purchase`, `register-with-coupon`, `group-admin-students`.
-- DB function `redeem_group_coupon(code, user_id)` atomically checks seat availability, inserts redemption, adds student to `group_members`, increments count.
-- DB function `user_has_video_access(user, video)` already grants access via group membership when a matching `subscription_entitlements` row exists for the group's `product_id`.
-- `GroupAdmin` page with `GroupAdminCoupons` and `GroupAdminStudents` tabs.
-- Pricing page already has "Buy for a Group" button that opens a dialog (group name + seat count) and calls `create-group-checkout`.
+So the UI flag `isSubscribed` (computed live from Stripe in `check-subscription`) is `false`, but the server-side access check (RLS / RPC) trusts the stale DB row. They disagree, and the RLS path wins for video playback.
 
-## What's missing / needs work
+# Fix
 
-1. **Subscription lifecycle for groups** — `group_purchases` only stores `stripe_session_id` + `product_id`. We never persist the Stripe subscription id, status, or `current_period_end`, so we can't enforce "same period of time as the group admin" or detect cancellations.
-2. **Entitlements not seeded** — `subscription_entitlements` is empty for the group price IDs, so even paid groups grant no video access today.
-3. **Shareable invite link** — coupon codes exist but there's no public `/join?code=XXX` URL to drop into an email or LMS.
-4. **Auth UX for students** — `Auth.tsx` needs a coupon-code field (or dedicated `/join` page) that calls `register-with-coupon`.
-5. **Email delivery** — after successful checkout the teacher sees the code on `/account`, but we don't email it. Optional but expected.
-6. **Per-coupon seat caps** — coupon `max_redemptions` is set to the seat count of the most recent purchase. If a group buys more seats later we need a way to add a top-up (new coupon) or expand seats (expand `max_redemptions`).
+Two changes, both server-side. No frontend changes required.
 
-## Plan
+## 1. Make `check-subscription` write back to `public.subscriptions`
 
-### 1. Persist group subscription state
+When the edge function runs, it already knows the truth from Stripe. Have it reconcile the local table for the current user:
 
-Add columns to `group_purchases`:
+- If Stripe returns an active/trialing subscription: upsert the row (status, price_id, product_id, current_period_end, cancel_at_period_end, etc.).
+- If Stripe returns no active/trialing subscription: mark any local rows for this `user_id` whose status is `active` or `trialing` as `canceled` and clear `current_period_end` if it's in the past.
 
-- `stripe_subscription_id text`
-- `status text default 'active'` — `active | past_due | canceled | incomplete`
-- `current_period_end timestamptz`
-- `cancel_at_period_end boolean default false`
-- `seat_count int` — denormalized so coupons can match later
+This runs whenever the user (or any client) calls `check-subscription`, which AuthContext does on login and on focus, so stale rows self-heal quickly.
 
-Update `verify-group-purchase` to:
-- Retrieve the Checkout Session with `expand: ['subscription']`.
-- Upsert the subscription id, status, and period end onto `group_purchases`.
+## 2. Tighten `user_has_video_access` for individual subs
 
-Add a new edge function `sync-group-subscription` modeled after the existing `sync-subscription` for individuals. Called:
-- Right after checkout success.
-- When the group admin loads `/group-admin` (auto-refresh, debounce ~60s).
-- Lazily when a student tries to play a gated video and the group's `current_period_end` is stale.
+Defensive belt-and-suspenders so a stale row can't grant access even if step 1 hasn't run yet. Update the individual-subscription branch of the function to also require:
 
-### 2. Gate student access by group subscription period
+```
+AND (s.current_period_end IS NULL OR s.current_period_end > now())
+```
 
-Update `user_has_video_access` so the group branch also requires the linked `group_purchases` row to be `status in ('active','trialing')` AND `current_period_end > now()`. Today it only checks that the row exists. This is the single change that delivers "same access for the same period of time as the group admin."
+(This already exists for the group-purchase branch — we mirror it for `subscriptions`.) Rows with a NULL period end stay valid only while `status` is active/trialing; once step 1 flips them to canceled, they drop out.
 
-### 3. Seed entitlements
+Group access logic stays unchanged.
 
-Insert two `subscription_entitlements` rows (audience='group', access_type='full') keyed to the existing monthly + annual group price IDs. Without these, `user_has_video_access` returns false even after a successful purchase.
+# Technical changes
 
-If group plans ever support category-only access, add `audience='group', access_type='category', category_id=…` rows per category — the resolver already supports this.
+- **Edge function** `supabase/functions/check-subscription/index.ts`
+  - After computing `selectedSubscription`, use the existing service-role `supabaseClient` to:
+    - On no active/trialing: `update public.subscriptions set status='canceled', updated_at=now() where user_id=$user and status in ('active','trialing')`.
+    - On active/trialing: `upsert` into `public.subscriptions` keyed by `stripe_subscription_id` with the latest fields.
+- **Migration** updating `public.user_has_video_access` to add the period-end guard on the individual subscription EXISTS clause.
 
-### 4. Shareable invite link + dedicated /join page
+# Out of scope
 
-Add a public route `/join` (and `/join/:code`) that:
-- Pre-fills the coupon field from the URL.
-- Shows the group name and "X seats remaining" (looked up via a new lightweight `GET` edge function `lookup-coupon` that returns only `{ groupName, seatsLeft, expiresAt, valid, reason }` — never sensitive data).
-- Renders the email/password/full-name form and calls `register-with-coupon`.
-- On success: shows "Check your email to verify, then sign in."
-
-In `GroupAdminCoupons`, add a "Copy invite link" button next to "Copy code" that copies `${origin}/join/${code}`.
-
-### 5. Improve teacher post-purchase experience
-
-In `Account.tsx`, when redirected back with `?group_purchase=success&session_id=…`:
-- Call `verify-group-purchase` (already does this).
-- Show a success card with the generated coupon code, the invite link, seat count, and a "Copy" + "Email to students" button.
-- Link to `/group-admin` for ongoing management.
-
-Optionally email the teacher via a new `email-group-coupon` edge function (Resend-style template with the link). Mark this as nice-to-have; teacher already sees the code in-app.
-
-### 6. Add coupon-code shortcut on the auth screen
-
-In `Auth.tsx` (signup mode), add a small "Have a class code?" link that routes to `/join`. This avoids confusing existing direct signups while still giving students a discoverable path if they land on the main auth page.
-
-### 7. Group admin self-service after purchase
-
-In `GroupAdminCoupons`:
-- Show subscription status badge (Active / Past due / Canceled, period end date) loaded from `group_purchases`.
-- Disable "Regenerate" / "Toggle active" when the underlying subscription is no longer active.
-- Add an "Expand seats" affordance that opens Stripe Customer Portal (existing `customer-portal` function works for any Stripe customer).
-
-### 8. Tests / verification
-
-- `register-with-coupon` already has rate limiting and rollback — re-verify with `supabase--curl_edge_functions` using a fresh code.
-- After seeding entitlements, log in as a redeemed student and confirm `user_has_video_access(uid, video_id)` returns true via `read_query`.
-- Cancel the group's Stripe subscription in test mode; confirm students lose access at period end.
-
-## Technical notes (for implementer)
-
-- New migration: `group_purchases` columns, plus an index on `(stripe_subscription_id)` and `(group_id, status)`.
-- New migration: replace `user_has_video_access` body — the group branch becomes:
-  ```sql
-  JOIN public.group_purchases gp
-    ON gp.group_id = gm.group_id
-   AND gp.status IN ('active','trialing')
-   AND (gp.current_period_end IS NULL OR gp.current_period_end > now())
-  ```
-  Keep the existing entitlement join.
-- New migration: insert `subscription_entitlements` rows for the group monthly + annual price IDs.
-- Edge functions follow project rules: Deno native `fetch` to Stripe REST (no SDK), use existing `corsHeaders` style, validate input with the same patterns used in `register-with-coupon`.
-- Frontend new files: `src/pages/Join.tsx`, route in `App.tsx`, "Copy invite link" button in `GroupAdminCoupons`.
-- No changes to `categories`, `videos`, or individual subscription flows.
-
-## Out of scope for this plan
-
-- Bulk CSV roster import.
-- Per-student email invitations from inside the app (could be a follow-up using Resend).
-- Group admin assigning specific subcategories to specific students — current model gives every redeemed student the same access as the group purchase.
+- No UI changes. `VideoCard`, `VideoDetail`, and `AuthContext` already behave correctly once `user_has_video_access` returns `false`.
+- Webhook-based syncing (more robust long term) — not required to resolve this bug.
