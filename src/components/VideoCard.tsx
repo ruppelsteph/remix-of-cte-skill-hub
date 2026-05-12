@@ -251,7 +251,7 @@ export function VideoCard({ video, pathway, categoryName, index = 0 }: VideoCard
             </p>
             <div className="flex gap-2">
               <Button asChild size="sm" variant="outline">
-                <Link to={`/videos/${video.id}`} onClick={() => setOpen(false)}>
+                <Link to={detailsHref} onClick={() => setOpen(false)}>
                   Details
                 </Link>
               </Button>
