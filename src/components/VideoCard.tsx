@@ -34,11 +34,41 @@ const buildYouTubeEmbed = (url: string): string => {
 };
 
 export function VideoCard({ video, pathway, categoryName, index = 0 }: VideoCardProps) {
+  const { user } = useAuth();
   const [imageError, setImageError] = useState(false);
   const [open, setOpen] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
+  const [hasAccess, setHasAccess] = useState<boolean>(!!video.is_free);
+
+  useEffect(() => {
+    if (video.is_free) {
+      setHasAccess(true);
+      return;
+    }
+    if (!user) {
+      setHasAccess(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase.rpc("user_has_video_access", {
+        _user_id: user.id,
+        _video_id: video.id,
+      });
+      if (!cancelled) setHasAccess(!error && !!data);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user, video.id, video.is_free]);
+
+  const detailsHref = hasAccess
+    ? `/videos/${video.id}`
+    : user
+      ? "/pricing"
+      : "/auth?mode=signup";
 
   const getDurationDisplay = () => video.duration || null;
 
