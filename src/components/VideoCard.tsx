@@ -208,7 +208,7 @@ export function VideoCard({ video, pathway, categoryName, index = 0 }: VideoCard
               Watch preview
             </Button>
             <Button asChild size="sm" variant="outline">
-              <Link to={`/videos/${video.id}`}>
+              <Link to={detailsHref}>
                 <Info className="h-4 w-4 mr-1" />
                 Details
               </Link>
