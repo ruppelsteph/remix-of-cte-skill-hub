@@ -1,49 +1,66 @@
-# Why you're seeing the full video
 
-Your account (`ruppelpublishing@gmail.com`) is **not** an admin. The reason you have access is a **stale row** in `public.subscriptions`:
+# Goal
 
-- Stripe (source of truth) returns **0 subscriptions** for your customer (`cus_TkwlZNU0You1VA`) — see the latest `check-subscription` logs: `"No active or trialing subscription found"`.
-- But `public.subscriptions` still has a row for you with `status='active'`, `price_id=price_1SAaic4McSnLev84NI7X3yoJ`, `current_period_end=NULL`, last updated 2026-01-09.
-- That price has a `subscription_entitlements` row with `audience='individual'`, `access_type='full'`.
-- The DB function `user_has_video_access` checks the local `subscriptions` table (not Stripe), sees `status IN ('active','trialing')` with a `full` entitlement, and returns `true`.
-- RLS policy `View full sources with access` then exposes the Vimeo source on `video_sources`, so the player loads the full video instead of the YouTube preview.
+Let users buy a subscription that unlocks **all videos** (existing) **or** a single **top-level category** (new), monthly or annual. Group purchases get the same option.
 
-So the UI flag `isSubscribed` (computed live from Stripe in `check-subscription`) is `false`, but the server-side access check (RLS / RPC) trusts the stale DB row. They disagree, and the RLS path wins for video playback.
+The data model already supports this — `subscription_entitlements` has `access_type='category'` and a `category_id` column, and `user_has_video_access` already expands ancestors and matches category entitlements. So this is mostly: (1) seed entitlements for the new Stripe prices, (2) update the Pricing page UI, (3) make sure `check-subscription` and group checkout pass the chosen price through.
 
-# Fix
+# 1. Seed `subscription_entitlements` for the new category prices
 
-Two changes, both server-side. No frontend changes required.
+For each top-level category (Buildings & Trades, Computers, Cosmetology, Criminal Justice, Health Science, HVAC, Industrial, Mobile Equipment, Utility Line Technician, Welding) you've created Monthly + Annual Stripe products. We need the **price IDs** for each. Two options:
 
-## 1. Make `check-subscription` write back to `public.subscriptions`
+- **A.** You paste the 20 price IDs (10 categories × monthly/annual) and I insert them via migration.
+- **B.** I add an **Admin → Entitlements** page that lists every Stripe price the project knows about and lets an admin map each to: `audience` (individual / group / both), `billing_interval`, `access_type` (full / category), and `category_id`. This is reusable forever and avoids hardcoding.
 
-When the edge function runs, it already knows the truth from Stripe. Have it reconcile the local table for the current user:
+Recommend **B** plus a one-time helper to bulk-import. Each row inserted will have `audience='individual'` AND a parallel `audience='group'` row (same price, same category) so the same Stripe price works for individual and group purchases — matching how the existing all-access prices are seeded.
 
-- If Stripe returns an active/trialing subscription: upsert the row (status, price_id, product_id, current_period_end, cancel_at_period_end, etc.).
-- If Stripe returns no active/trialing subscription: mark any local rows for this `user_id` whose status is `active` or `trialing` as `canceled` and clear `current_period_end` if it's in the past.
+# 2. Pricing page (`src/pages/Pricing.tsx`)
 
-This runs whenever the user (or any client) calls `check-subscription`, which AuthContext does on login and on focus, so stale rows self-heal quickly.
+Restructure into two sections:
 
-## 2. Tighten `user_has_video_access` for individual subs
+- **All-Access** — current Monthly / Annual / School cards, unchanged.
+- **Single-Category Plans** — a new section with a category picker (dropdown or grid of 10 cards). When a category is selected, show Monthly and Annual buttons that call `create-checkout` with that category's price ID. Same UX for the "Buy for a Group" dialog: add a "Plan scope" select (All categories / specific category) before the Monthly/Annual select.
 
-Defensive belt-and-suspenders so a stale row can't grant access even if step 1 hasn't run yet. Update the individual-subscription branch of the function to also require:
+The `PRICE_IDS` const becomes a structured map:
 
+```ts
+const PRICE_IDS = {
+  full:    { monthly: "price_…", annual: "price_…" },
+  byCategory: {
+    [categoryId]: { monthly: "price_…", annual: "price_…" },
+    …
+  }
+}
 ```
-AND (s.current_period_end IS NULL OR s.current_period_end > now())
-```
 
-(This already exists for the group-purchase branch — we mirror it for `subscriptions`.) Rows with a NULL period end stay valid only while `status` is active/trialing; once step 1 flips them to canceled, they drop out.
+This map is hydrated at build time from the Admin entitlements (or hardcoded if we go with option A). The page fetches `categories` (parent_id IS NULL) to render names/slugs.
 
-Group access logic stays unchanged.
+# 3. Checkout edge functions
 
-# Technical changes
+- `create-checkout` (individual): already accepts an arbitrary `priceId` — no change needed.
+- `create-group-checkout`: already accepts `priceId` — verify it forwards correctly and that `verify-group-purchase` records the chosen `priceId` into `group_purchases.product_id` (the column `user_has_video_access` joins on). If not, fix that mapping so category group purchases resolve correctly.
 
-- **Edge function** `supabase/functions/check-subscription/index.ts`
-  - After computing `selectedSubscription`, use the existing service-role `supabaseClient` to:
-    - On no active/trialing: `update public.subscriptions set status='canceled', updated_at=now() where user_id=$user and status in ('active','trialing')`.
-    - On active/trialing: `upsert` into `public.subscriptions` keyed by `stripe_subscription_id` with the latest fields.
-- **Migration** updating `public.user_has_video_access` to add the period-end guard on the individual subscription EXISTS clause.
+# 4. Access resolution
+
+`user_has_video_access` already handles category entitlements (full vs category, recursive ancestor check). No DB function changes required once entitlements are seeded.
+
+# 5. UI surfaces that show subscription status
+
+- **Account page** — display subscription's product name + scope ("All categories" or the category name). Pull from joined `subscription_entitlements` + `categories`.
+- **VideoCard / VideoDetail** — current logic uses `user_has_video_access` RPC, which already returns the right answer per video. No change beyond confirming the upgrade CTA copy ("Subscribe to unlock Welding videos").
+
+# 6. `check-subscription` edge function
+
+Already syncs the active Stripe subscription's `price_id` into `public.subscriptions`. As long as the new category prices have entitlement rows, access will resolve correctly. No code change required.
+
+# Open questions
+
+1. **Option A vs B above** — admin UI, or paste price IDs once?
+2. **Pricing display** — what are the per-category monthly/annual prices? Same $49.99 / $39.99 as all-access, or cheaper? Needed for the cards.
+3. Should the all-access plan visually be marketed as the "best value" upgrade from a single category, with a simple comparison? (Recommend yes — small comparison strip under the category section.)
 
 # Out of scope
 
-- No UI changes. `VideoCard`, `VideoDetail`, and `AuthContext` already behave correctly once `user_has_video_access` returns `false`.
-- Webhook-based syncing (more robust long term) — not required to resolve this bug.
+- Refactoring `pathways` (already deprecated per project memory).
+- Webhook-driven subscription sync.
+- Prorated upgrades from category → all-access (Stripe Customer Portal handles this manually for now).
