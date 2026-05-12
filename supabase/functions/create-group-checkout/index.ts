@@ -143,6 +143,7 @@ serve(async (req) => {
       cancel_url: `${origin}/pricing?canceled=true`,
       metadata: {
         group_id: groupId!,
+        price_id: priceId,
         product_id: productId,
         purchase_type: "group",
         seat_count: String(seatCount),
@@ -150,6 +151,7 @@ serve(async (req) => {
       subscription_data: {
         metadata: {
           group_id: groupId!,
+          price_id: priceId,
           product_id: productId,
           purchase_type: "group",
           seat_count: String(seatCount),
