@@ -265,7 +265,7 @@ const Pricing = () => {
                   <span className="text-muted-foreground">/month</span>
                 </div>
                 <ul className="space-y-3 mb-8">
-                  {["Access all videos", "All CTE pathways", "New content monthly", "Cancel anytime"].map((f) => (
+                  {["Access all videos", "All CTE categories", "New content monthly", "Cancel anytime"].map((f) => (
                     <li key={f} className="flex items-start gap-2 text-sm text-muted-foreground">
                       <CheckCircle className="h-5 w-5 text-primary shrink-0 mt-0.5" />{f}
                     </li>
@@ -288,7 +288,7 @@ const Pricing = () => {
                   <span className="text-muted-foreground">/year</span>
                 </div>
                 <ul className="space-y-3 mb-8">
-                  {["Access all videos", "All CTE pathways", "New content monthly", "Priority support", "Downloadable resources"].map((f) => (
+                  {["Access all videos", "All CTE categories", "New content monthly", "Priority support", "Downloadable resources"].map((f) => (
                     <li key={f} className="flex items-start gap-2 text-sm text-muted-foreground">
                       <CheckCircle className="h-5 w-5 text-primary shrink-0 mt-0.5" />{f}
                     </li>
