@@ -54,8 +54,8 @@ export function VideoCard({ video, pathway, categoryName, index = 0 }: VideoCard
     let cancelled = false;
     (async () => {
       const { data, error } = await supabase.rpc("user_has_video_access", {
-        _user_id: user.id,
-        _video_id: video.id,
+        _user: user.id,
+        _video: video.id,
       });
       if (!cancelled) setHasAccess(!error && !!data);
     })();
