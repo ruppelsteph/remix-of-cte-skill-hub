@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Clock, Play, Signal, Info } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import type { Tables } from "@/integrations/supabase/types";
 
 interface VideoCardProps {
@@ -33,11 +34,41 @@ const buildYouTubeEmbed = (url: string): string => {
 };
 
 export function VideoCard({ video, pathway, categoryName, index = 0 }: VideoCardProps) {
+  const { user } = useAuth();
   const [imageError, setImageError] = useState(false);
   const [open, setOpen] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
+  const [hasAccess, setHasAccess] = useState<boolean>(!!video.is_free);
+
+  useEffect(() => {
+    if (video.is_free) {
+      setHasAccess(true);
+      return;
+    }
+    if (!user) {
+      setHasAccess(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase.rpc("user_has_video_access", {
+        _user: user.id,
+        _video: video.id,
+      });
+      if (!cancelled) setHasAccess(!error && !!data);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user, video.id, video.is_free]);
+
+  const detailsHref = hasAccess
+    ? `/videos/${video.id}`
+    : user
+      ? "/pricing"
+      : "/auth?mode=signup";
 
   const getDurationDisplay = () => video.duration || null;
 
@@ -177,7 +208,7 @@ export function VideoCard({ video, pathway, categoryName, index = 0 }: VideoCard
               Watch preview
             </Button>
             <Button asChild size="sm" variant="outline">
-              <Link to={`/videos/${video.id}`}>
+              <Link to={detailsHref}>
                 <Info className="h-4 w-4 mr-1" />
                 Details
               </Link>
@@ -220,7 +251,7 @@ export function VideoCard({ video, pathway, categoryName, index = 0 }: VideoCard
             </p>
             <div className="flex gap-2">
               <Button asChild size="sm" variant="outline">
-                <Link to={`/videos/${video.id}`} onClick={() => setOpen(false)}>
+                <Link to={detailsHref} onClick={() => setOpen(false)}>
                   Details
                 </Link>
               </Button>
