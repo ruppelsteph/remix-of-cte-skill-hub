@@ -182,6 +182,23 @@ serve(async (req) => {
         totalSubscriptions: subscriptions.length,
         allStatuses: subscriptions.map(s => s.status)
       });
+
+      // Reconcile: mark any stale local active/trialing rows as canceled.
+      try {
+        const { error: cancelErr } = await supabaseClient
+          .from("subscriptions")
+          .update({ status: "canceled", cancel_at_period_end: false, updated_at: new Date().toISOString() })
+          .eq("user_id", user.id)
+          .in("status", ["active", "trialing"]);
+        if (cancelErr) {
+          logStep("Failed to mark stale subscriptions canceled", { error: cancelErr.message });
+        } else {
+          logStep("Marked any stale local subscriptions as canceled");
+        }
+      } catch (e) {
+        logStep("Error reconciling stale subscriptions", { error: (e as Error).message });
+      }
+
       return new Response(JSON.stringify({
         subscribed: false,
         status: "none",
