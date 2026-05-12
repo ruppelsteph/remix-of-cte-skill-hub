@@ -182,6 +182,23 @@ serve(async (req) => {
         totalSubscriptions: subscriptions.length,
         allStatuses: subscriptions.map(s => s.status)
       });
+
+      // Reconcile: mark any stale local active/trialing rows as canceled.
+      try {
+        const { error: cancelErr } = await supabaseClient
+          .from("subscriptions")
+          .update({ status: "canceled", cancel_at_period_end: false, updated_at: new Date().toISOString() })
+          .eq("user_id", user.id)
+          .in("status", ["active", "trialing"]);
+        if (cancelErr) {
+          logStep("Failed to mark stale subscriptions canceled", { error: cancelErr.message });
+        } else {
+          logStep("Marked any stale local subscriptions as canceled");
+        }
+      } catch (e) {
+        logStep("Error reconciling stale subscriptions", { error: (e as Error).message });
+      }
+
       return new Response(JSON.stringify({
         subscribed: false,
         status: "none",
@@ -263,6 +280,44 @@ serve(async (req) => {
       priceInterval,
       createdIso
     });
+
+    // Reconcile local subscriptions table so RLS / user_has_video_access stay in sync with Stripe.
+    try {
+      const { error: cancelOthersErr } = await supabaseClient
+        .from("subscriptions")
+        .update({ status: "canceled", cancel_at_period_end: false, updated_at: new Date().toISOString() })
+        .eq("user_id", user.id)
+        .neq("stripe_subscription_id", selectedSubscription.id)
+        .in("status", ["active", "trialing"]);
+      if (cancelOthersErr) {
+        logStep("Failed to cancel other stale subscriptions", { error: cancelOthersErr.message });
+      }
+
+      const { error: upsertErr } = await supabaseClient
+        .from("subscriptions")
+        .upsert(
+          {
+            user_id: user.id,
+            stripe_subscription_id: selectedSubscription.id,
+            stripe_customer_id: stripeCustomerId,
+            status: selectedSubscription.status,
+            cancel_at_period_end: selectedSubscription.cancel_at_period_end,
+            price_id: priceId,
+            product_id: productId,
+            product_name: productName,
+            current_period_end: subscriptionEnd,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "stripe_subscription_id" }
+        );
+      if (upsertErr) {
+        logStep("Failed to upsert subscription", { error: upsertErr.message });
+      } else {
+        logStep("Upserted local subscription row");
+      }
+    } catch (e) {
+      logStep("Error reconciling subscription", { error: (e as Error).message });
+    }
 
     return new Response(JSON.stringify({
       subscribed: true,
