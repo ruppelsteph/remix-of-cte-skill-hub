@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { CheckCircle, ArrowRight, Loader2, Users, Layers } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { startCategoryCheckout } from "@/lib/checkout";
 import {
   Dialog,
   DialogContent,
