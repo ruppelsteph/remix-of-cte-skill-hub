@@ -16,6 +16,10 @@ import {
 } from "@/components/ui/breadcrumb";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
+import { CategoryPriceBlock } from "@/components/videos/CategoryPriceBlock";
+import { CategorySubscribeBanner } from "@/components/videos/CategorySubscribeBanner";
+import { startCategoryCheckout } from "@/lib/checkout";
+import { useToast } from "@/hooks/use-toast";
 
 const S3_BASE = "https://cte-email-assets.s3.us-east-1.amazonaws.com/categories";
 
