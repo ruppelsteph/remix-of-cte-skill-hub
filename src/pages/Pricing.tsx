@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { CheckCircle, ArrowRight, Loader2, Users, Layers } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { startCategoryCheckout } from "@/lib/checkout";
 import {
   Dialog,
   DialogContent,
@@ -137,31 +138,15 @@ const Pricing = () => {
 
   const handleCheckout = async (priceId: string) => {
     setLoadingPriceId(priceId);
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        navigate(`/auth?mode=signup&redirect=/pricing`);
-        return;
-      }
-      const { data, error } = await supabase.functions.invoke("create-checkout", {
-        body: { priceId },
-      });
-      if (error) throw error;
-      if (data?.url) {
-        window.location.href = data.url;
-      } else {
-        throw new Error("No checkout URL returned");
-      }
-    } catch (error) {
-      console.error("Checkout error:", error);
+    const err = await startCategoryCheckout(priceId, "/pricing");
+    if (err) {
       toast({
         title: "Checkout Error",
-        description: error instanceof Error ? error.message : "Failed to start checkout.",
+        description: err,
         variant: "destructive",
       });
-    } finally {
-      setLoadingPriceId(null);
     }
+    setLoadingPriceId(null);
   };
 
   const openGroupDialog = async () => {

@@ -16,6 +16,10 @@ import {
 } from "@/components/ui/breadcrumb";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
+import { CategoryPriceBlock } from "@/components/videos/CategoryPriceBlock";
+import { CategorySubscribeBanner } from "@/components/videos/CategorySubscribeBanner";
+import { startCategoryCheckout } from "@/lib/checkout";
+import { useToast } from "@/hooks/use-toast";
 
 const S3_BASE = "https://cte-email-assets.s3.us-east-1.amazonaws.com/categories";
 
@@ -70,13 +74,31 @@ type Category = {
   is_active: boolean;
 };
 
+type Entitlement = {
+  stripe_price_id: string;
+  audience: "individual" | "group";
+  billing_interval: "month" | "year";
+  access_type: "full" | "category";
+  category_id: number | null;
+  unit_amount: number | null;
+  currency: string | null;
+};
+
+type SubscriptionRow = {
+  status: string;
+  price_id: string | null;
+  current_period_end: string | null;
+};
+
 export default function Videos() {
+  const { toast } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
   const [searchQuery, setSearchQuery] = useState(searchParams.get("q") || "");
   const initialPath = searchParams.get("path");
   const [categoryPath, setCategoryPath] = useState<number[]>(
     initialPath ? initialPath.split(",").map(Number).filter(Boolean) : []
   );
+  const [loadingPriceId, setLoadingPriceId] = useState<string | null>(null);
 
   const { data: videos = [], isLoading: videosLoading } = useQuery({
     queryKey: ["videos"],
@@ -101,6 +123,32 @@ export default function Videos() {
         .order("name");
       if (error) throw error;
       return data as Category[];
+    },
+  });
+
+  const { data: entitlements = [] } = useQuery({
+    queryKey: ["entitlements", "individual"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("subscription_entitlements")
+        .select("stripe_price_id,audience,billing_interval,access_type,category_id,unit_amount,currency")
+        .eq("audience", "individual");
+      if (error) throw error;
+      return (data ?? []) as Entitlement[];
+    },
+  });
+
+  const { data: userSubs = [] } = useQuery({
+    queryKey: ["my-subscriptions"],
+    queryFn: async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return [] as SubscriptionRow[];
+      const { data, error } = await supabase
+        .from("subscriptions")
+        .select("status,price_id,current_period_end")
+        .in("status", ["active", "trialing"]);
+      if (error) return [];
+      return (data ?? []) as SubscriptionRow[];
     },
   });
 
@@ -204,6 +252,67 @@ export default function Videos() {
   };
 
   const hasActiveFilters = searchQuery || categoryPath.length > 0;
+
+  // --- Subscription / checkout helpers ---------------------------------
+  const topLevelAncestorId = (catId: number): number | null => {
+    let cur = categoriesById.get(catId);
+    if (!cur) return null;
+    while (cur && cur.parent_id != null) {
+      const parent = categoriesById.get(cur.parent_id);
+      if (!parent) break;
+      cur = parent;
+    }
+    return cur?.id ?? null;
+  };
+
+  const entitlementFor = (
+    topCatId: number,
+    interval: "month" | "year"
+  ): Entitlement | undefined =>
+    entitlements.find(
+      (e) =>
+        e.access_type === "category" &&
+        e.category_id === topCatId &&
+        e.billing_interval === interval
+    );
+
+  const accessibleCategoryIds = useMemo(() => {
+    const ids = new Set<number>();
+    let hasFull = false;
+    const subPriceIds = new Set(
+      userSubs
+        .filter((s) => !s.current_period_end || new Date(s.current_period_end) > new Date())
+        .map((s) => s.price_id)
+        .filter(Boolean) as string[]
+    );
+    for (const e of entitlements) {
+      if (!subPriceIds.has(e.stripe_price_id)) continue;
+      if (e.access_type === "full") hasFull = true;
+      else if (e.category_id != null) ids.add(e.category_id);
+    }
+    return { ids, hasFull };
+  }, [entitlements, userSubs]);
+
+  const userHasCategoryAccess = (catId: number): boolean => {
+    if (accessibleCategoryIds.hasFull) return true;
+    const top = topLevelAncestorId(catId);
+    return top != null && accessibleCategoryIds.ids.has(top);
+  };
+
+  const handleCheckout = async (priceId: string) => {
+    setLoadingPriceId(priceId);
+    const returnPath = `/videos${categoryPath.length ? `?path=${categoryPath.join(",")}` : ""}`;
+    const err = await startCategoryCheckout(priceId, returnPath);
+    if (err) {
+      toast({
+        title: "Checkout Error",
+        description: err,
+        variant: "destructive",
+      });
+    }
+    setLoadingPriceId(null);
+  };
+
 
   const crumbs = categoryPath
     .map((id) => categoriesById.get(id))
@@ -323,11 +432,19 @@ export default function Videos() {
                   const subCount = (childrenOf.get(cat.id) || []).length;
                   const img = imageForCategory(cat);
                   return (
-                    <button
+                    <div
                       key={cat.id}
+                      role="button"
+                      tabIndex={0}
                       onClick={() => drillInto(cat.id)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          drillInto(cat.id);
+                        }
+                      }}
                       className={cn(
-                        "group flex flex-col overflow-hidden rounded-2xl border bg-card text-left shadow-sm transition-all",
+                        "group flex cursor-pointer flex-col overflow-hidden rounded-2xl border bg-card text-left shadow-sm transition-all",
                         "hover:shadow-lg hover:border-primary/40 hover:-translate-y-0.5"
                       )}
                     >
@@ -371,8 +488,24 @@ export default function Videos() {
                             {subCount === 1 ? "subcategory" : "subcategories"}
                           </p>
                         )}
+                        {(() => {
+                          const top = topLevelAncestorId(cat.id);
+                          if (top == null) return null;
+                          const monthly = entitlementFor(top, "month");
+                          const yearly = entitlementFor(top, "year");
+                          if (!monthly && !yearly && !accessibleCategoryIds.hasFull) return null;
+                          return (
+                            <CategoryPriceBlock
+                              monthly={monthly}
+                              yearly={yearly}
+                              hasAccess={userHasCategoryAccess(cat.id)}
+                              loadingPriceId={loadingPriceId}
+                              onCheckout={handleCheckout}
+                            />
+                          );
+                        })()}
                       </div>
-                    </button>
+                    </div>
                   );
                 })}
               </div>
@@ -386,6 +519,24 @@ export default function Videos() {
             </>
           ) : (
             <>
+              {currentCategoryId != null && !isSearching && (() => {
+                const top = topLevelAncestorId(currentCategoryId);
+                if (top == null) return null;
+                const topCat = categoriesById.get(top);
+                const monthly = entitlementFor(top, "month");
+                const yearly = entitlementFor(top, "year");
+                if (!monthly && !yearly && !accessibleCategoryIds.hasFull) return null;
+                return (
+                  <CategorySubscribeBanner
+                    categoryName={topCat?.name ?? "this category"}
+                    monthly={monthly}
+                    yearly={yearly}
+                    hasAccess={userHasCategoryAccess(currentCategoryId)}
+                    loadingPriceId={loadingPriceId}
+                    onCheckout={handleCheckout}
+                  />
+                );
+              })()}
               <div className="mb-4 text-sm text-muted-foreground">
                 {isSearching
                   ? `Found ${filteredVideos.length} ${filteredVideos.length === 1 ? "video" : "videos"} matching "${searchQuery}"`
