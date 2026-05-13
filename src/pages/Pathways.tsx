@@ -29,7 +29,7 @@ const Pathways = () => {
       <section className="bg-secondary py-16 lg:py-20">
         <div className="container mx-auto px-4 text-center">
           <h1 className="text-4xl md:text-5xl font-bold text-secondary-foreground mb-4">
-            CTE Pathways
+            CTE Categories
           </h1>
           <p className="text-lg max-w-2xl mx-auto text-secondary-foreground">
             Explore career and technical education pathways. Each pathway contains curated video content 
