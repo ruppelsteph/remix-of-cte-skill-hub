@@ -32,7 +32,7 @@ const Pathways = () => {
             CTE Categories
           </h1>
           <p className="text-lg max-w-2xl mx-auto text-secondary-foreground">
-            Explore career and technical education pathways. Each pathway contains curated video content 
+            Explore career and technical education categories. Each category contains curated video content 
             aligned with industry standards and real-world skills.
           </p>
         </div>
