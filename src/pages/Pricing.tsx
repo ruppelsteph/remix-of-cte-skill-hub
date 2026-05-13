@@ -139,7 +139,7 @@ const Pricing = () => {
   const handleCheckout = async (priceId: string) => {
     setLoadingPriceId(priceId);
     const result = await startCategoryCheckout(priceId, "/pricing");
-    if ("ok" in result && !result.ok && !("redirected" in result)) {
+    if (!result.ok && !("redirected" in result)) {
       toast({
         title: "Checkout Error",
         description: result.error,
