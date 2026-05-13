@@ -37,15 +37,7 @@ export function Footer() {
           {/* Brand */}
           <div className="lg:col-span-2">
             <Link to="/" className="flex items-center gap-2">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary">
-                <svg
-                  viewBox="0 0 24 24"
-                  className="h-6 w-6 text-primary-foreground"
-                  fill="currentColor"
-                >
-                  <path d="M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 4v-11l-4 4z" />
-                </svg>
-              </div>
+              <img src={cteLogo} alt="CTE Skills logo" className="h-10 w-10 object-contain" />
               <span className="text-lg font-heading font-bold">CTE Skills</span>
             </Link>
             <p className="mt-4 max-w-xs text-sm text-secondary-foreground/80">
