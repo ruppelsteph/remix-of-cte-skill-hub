@@ -74,13 +74,31 @@ type Category = {
   is_active: boolean;
 };
 
+type Entitlement = {
+  stripe_price_id: string;
+  audience: "individual" | "group";
+  billing_interval: "month" | "year";
+  access_type: "full" | "category";
+  category_id: number | null;
+  unit_amount: number | null;
+  currency: string | null;
+};
+
+type SubscriptionRow = {
+  status: string;
+  price_id: string | null;
+  current_period_end: string | null;
+};
+
 export default function Videos() {
+  const { toast } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
   const [searchQuery, setSearchQuery] = useState(searchParams.get("q") || "");
   const initialPath = searchParams.get("path");
   const [categoryPath, setCategoryPath] = useState<number[]>(
     initialPath ? initialPath.split(",").map(Number).filter(Boolean) : []
   );
+  const [loadingPriceId, setLoadingPriceId] = useState<string | null>(null);
 
   const { data: videos = [], isLoading: videosLoading } = useQuery({
     queryKey: ["videos"],
