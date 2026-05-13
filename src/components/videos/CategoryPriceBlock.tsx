@@ -1,4 +1,4 @@
-import { Loader2 } from "lucide-react";
+import { Loader2, ShoppingCart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface PriceLike {
@@ -49,56 +49,77 @@ export function CategoryPriceBlock({
     e.preventDefault();
   };
 
+  const monthlyLoading = monthly && loadingPriceId === monthly.stripe_price_id;
+  const yearlyLoading = yearly && loadingPriceId === yearly.stripe_price_id;
+
   return (
     <div
-      className="mt-4 space-y-2"
+      className="mt-4 border-t pt-4"
       onClick={stop}
       onMouseDown={stop}
     >
-      <div className="text-xs text-muted-foreground">
-        {monthly?.unit_amount != null && (
-          <span>From {fmt(monthly.unit_amount, monthly.currency)}/mo</span>
-        )}
-        {monthly?.unit_amount != null && yearly?.unit_amount != null && (
-          <span> · </span>
-        )}
-        {yearly?.unit_amount != null && (
-          <span>{fmt(yearly.unit_amount, yearly.currency)}/yr</span>
-        )}
+      <div className="flex items-baseline gap-2">
+        {monthly?.unit_amount != null ? (
+          <>
+            <span className="text-2xl font-bold tracking-tight text-foreground">
+              {fmt(monthly.unit_amount, monthly.currency)}
+            </span>
+            <span className="text-sm text-muted-foreground">/ month</span>
+          </>
+        ) : yearly?.unit_amount != null ? (
+          <>
+            <span className="text-2xl font-bold tracking-tight text-foreground">
+              {fmt(yearly.unit_amount, yearly.currency)}
+            </span>
+            <span className="text-sm text-muted-foreground">/ year</span>
+          </>
+        ) : null}
       </div>
-      <div className="flex flex-wrap gap-2">
+      {monthly?.unit_amount != null && yearly?.unit_amount != null && (
+        <p className="mt-1 text-xs text-muted-foreground">
+          or {fmt(yearly.unit_amount, yearly.currency)} billed yearly
+        </p>
+      )}
+
+      <div className="mt-3 flex flex-col gap-2">
         {monthly && (
           <Button
             size="sm"
-            variant="outline"
-            className="flex-1"
+            className="w-full"
             onClick={(e) => {
               stop(e);
               onCheckout(monthly.stripe_price_id);
             }}
-            disabled={loadingPriceId === monthly.stripe_price_id}
+            disabled={!!monthlyLoading}
           >
-            {loadingPriceId === monthly.stripe_price_id ? (
+            {monthlyLoading ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
-              "Monthly"
+              <>
+                <ShoppingCart className="h-4 w-4" />
+                Subscribe Monthly
+              </>
             )}
           </Button>
         )}
         {yearly && (
           <Button
             size="sm"
-            className="flex-1"
+            variant="outline"
+            className="w-full"
             onClick={(e) => {
               stop(e);
               onCheckout(yearly.stripe_price_id);
             }}
-            disabled={loadingPriceId === yearly.stripe_price_id}
+            disabled={!!yearlyLoading}
           >
-            {loadingPriceId === yearly.stripe_price_id ? (
+            {yearlyLoading ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
-              "Yearly"
+              <>
+                <ShoppingCart className="h-4 w-4" />
+                Purchase Yearly
+              </>
             )}
           </Button>
         )}
