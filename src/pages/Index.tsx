@@ -80,8 +80,8 @@ const Index = () => {
               <p className="text-sm text-muted-foreground">Training Videos</p>
             </div>
             <div>
-              <p className="text-3xl md:text-4xl font-bold text-primary mb-1">6</p>
-              <p className="text-sm text-muted-foreground">CTE Pathways</p>
+              <p className="text-3xl md:text-4xl font-bold text-primary mb-1">9</p>
+              <p className="text-sm text-muted-foreground">CTE Categories</p>
             </div>
             <div>
               <p className="text-3xl md:text-4xl font-bold text-primary mb-1">500+</p>
