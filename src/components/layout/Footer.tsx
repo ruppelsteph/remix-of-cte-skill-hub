@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { Facebook, Twitter, Linkedin, Youtube, Mail } from "lucide-react";
+import cteLogo from "@/assets/cte-logo.png";
 
 const footerLinks = {
   platform: [
