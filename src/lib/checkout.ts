@@ -5,10 +5,15 @@ import { supabase } from "@/integrations/supabase/client";
  * If the user is not signed in, sends them to /auth with a redirect back.
  * Returns true if a redirect was initiated, false on failure (caller can toast).
  */
+export type CheckoutResult =
+  | { ok: true }
+  | { ok: false; redirected: true }
+  | { ok: false; redirected?: false; error: string };
+
 export async function startCategoryCheckout(
   priceId: string,
   returnPath: string
-): Promise<{ ok: true } | { ok: false; error: string } | { ok: false; redirected: true }> {
+): Promise<CheckoutResult> {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) {
     const url = `/auth?mode=signup&redirect=${encodeURIComponent(returnPath)}`;
