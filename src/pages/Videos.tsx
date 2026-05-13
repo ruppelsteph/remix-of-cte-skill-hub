@@ -432,11 +432,19 @@ export default function Videos() {
                   const subCount = (childrenOf.get(cat.id) || []).length;
                   const img = imageForCategory(cat);
                   return (
-                    <button
+                    <div
                       key={cat.id}
+                      role="button"
+                      tabIndex={0}
                       onClick={() => drillInto(cat.id)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          drillInto(cat.id);
+                        }
+                      }}
                       className={cn(
-                        "group flex flex-col overflow-hidden rounded-2xl border bg-card text-left shadow-sm transition-all",
+                        "group flex cursor-pointer flex-col overflow-hidden rounded-2xl border bg-card text-left shadow-sm transition-all",
                         "hover:shadow-lg hover:border-primary/40 hover:-translate-y-0.5"
                       )}
                     >
