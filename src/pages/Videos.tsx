@@ -505,7 +505,7 @@ export default function Videos() {
                           );
                         })()}
                       </div>
-                    </button>
+                    </div>
                   );
                 })}
               </div>
