@@ -151,6 +151,8 @@ export default function Videos() {
       return (data ?? []) as SubscriptionRow[];
     },
   });
+
+  const categoriesById = useMemo(() => {
     const map = new Map<number, Category>();
     categories.forEach((c) => map.set(c.id, c));
     return map;
