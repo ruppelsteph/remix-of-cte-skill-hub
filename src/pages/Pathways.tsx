@@ -116,10 +116,10 @@ const Pathways = () => {
       <section className="py-16 bg-muted/30">
         <div className="container mx-auto px-4 text-center">
           <h2 className="text-2xl md:text-3xl font-bold text-foreground mb-4">
-            Can't find your pathway?
+            Can't find your category?
           </h2>
           <p className="text-muted-foreground mb-8 max-w-xl mx-auto">
-            We're constantly adding new content. Let us know what pathways you'd like to see.
+            We're constantly adding new content. Let us know what categories you'd like to see.
           </p>
           <Button asChild variant="outline" size="lg">
             <Link to="/about">Contact Us</Link>
