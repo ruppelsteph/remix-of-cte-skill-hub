@@ -519,6 +519,24 @@ export default function Videos() {
             </>
           ) : (
             <>
+              {currentCategoryId != null && !isSearching && (() => {
+                const top = topLevelAncestorId(currentCategoryId);
+                if (top == null) return null;
+                const topCat = categoriesById.get(top);
+                const monthly = entitlementFor(top, "month");
+                const yearly = entitlementFor(top, "year");
+                if (!monthly && !yearly && !accessibleCategoryIds.hasFull) return null;
+                return (
+                  <CategorySubscribeBanner
+                    categoryName={topCat?.name ?? "this category"}
+                    monthly={monthly}
+                    yearly={yearly}
+                    hasAccess={userHasCategoryAccess(currentCategoryId)}
+                    loadingPriceId={loadingPriceId}
+                    onCheckout={handleCheckout}
+                  />
+                );
+              })()}
               <div className="mb-4 text-sm text-muted-foreground">
                 {isSearching
                   ? `Found ${filteredVideos.length} ${filteredVideos.length === 1 ? "video" : "videos"} matching "${searchQuery}"`
