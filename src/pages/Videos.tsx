@@ -126,7 +126,31 @@ export default function Videos() {
     },
   });
 
-  const categoriesById = useMemo(() => {
+  const { data: entitlements = [] } = useQuery({
+    queryKey: ["entitlements", "individual"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("subscription_entitlements")
+        .select("stripe_price_id,audience,billing_interval,access_type,category_id,unit_amount,currency")
+        .eq("audience", "individual");
+      if (error) throw error;
+      return (data ?? []) as Entitlement[];
+    },
+  });
+
+  const { data: userSubs = [] } = useQuery({
+    queryKey: ["my-subscriptions"],
+    queryFn: async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return [] as SubscriptionRow[];
+      const { data, error } = await supabase
+        .from("subscriptions")
+        .select("status,price_id,current_period_end")
+        .in("status", ["active", "trialing"]);
+      if (error) return [];
+      return (data ?? []) as SubscriptionRow[];
+    },
+  });
     const map = new Map<number, Category>();
     categories.forEach((c) => map.set(c.id, c));
     return map;
