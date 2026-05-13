@@ -32,15 +32,7 @@ export function Header() {
         <div className="flex h-16 items-center justify-between">
           {/* Logo */}
           <Link to="/" className="flex items-center gap-2">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary">
-              <svg
-                viewBox="0 0 24 24"
-                className="h-6 w-6 text-primary-foreground"
-                fill="currentColor"
-              >
-                <path d="M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 4v-11l-4 4z" />
-              </svg>
-            </div>
+            <img src={cteLogo} alt="CTE Skills logo" className="h-10 w-10 object-contain" />
             <div className="flex flex-col">
               <span className="text-lg font-heading font-bold text-foreground">CTE Skills</span>
               <span className="hidden text-xs text-muted-foreground sm:block">Career & Technical Education</span>
