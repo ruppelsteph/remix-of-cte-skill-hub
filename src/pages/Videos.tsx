@@ -480,6 +480,22 @@ export default function Videos() {
                             {subCount === 1 ? "subcategory" : "subcategories"}
                           </p>
                         )}
+                        {(() => {
+                          const top = topLevelAncestorId(cat.id);
+                          if (top == null) return null;
+                          const monthly = entitlementFor(top, "month");
+                          const yearly = entitlementFor(top, "year");
+                          if (!monthly && !yearly && !accessibleCategoryIds.hasFull) return null;
+                          return (
+                            <CategoryPriceBlock
+                              monthly={monthly}
+                              yearly={yearly}
+                              hasAccess={userHasCategoryAccess(cat.id)}
+                              loadingPriceId={loadingPriceId}
+                              onCheckout={handleCheckout}
+                            />
+                          );
+                        })()}
                       </div>
                     </button>
                   );
