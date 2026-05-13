@@ -482,12 +482,6 @@ export default function Videos() {
                             {cat.description}
                           </p>
                         )}
-                        {subCount > 0 && (
-                          <p className="mt-3 text-xs text-muted-foreground">
-                            {subCount}{" "}
-                            {subCount === 1 ? "subcategory" : "subcategories"}
-                          </p>
-                        )}
                         {(() => {
                           const top = topLevelAncestorId(cat.id);
                           if (top == null) return null;
