@@ -4,8 +4,11 @@
 if (import.meta.hot) {
   let wasDisconnected = false;
   let polling = false;
+  let reloading = false;
 
   const reload = () => {
+    if (reloading) return;
+    reloading = true;
     // Small delay to let the new server fully come up.
     setTimeout(() => window.location.reload(), 150);
   };
@@ -15,8 +18,14 @@ if (import.meta.hot) {
     polling = true;
     const tick = async () => {
       try {
-        const res = await fetch("/@vite/ping", { cache: "no-store" });
-        if (res.ok) {
+        await fetch(window.location.origin, {
+          mode: "no-cors",
+          cache: "no-store",
+          headers: {
+            Accept: "text/x-vite-ping",
+          },
+        });
+        if (wasDisconnected) {
           polling = false;
           reload();
           return;
