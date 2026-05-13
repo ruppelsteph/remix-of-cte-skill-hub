@@ -55,7 +55,6 @@ export function CategoryPriceBlock({
 
   return (
     <div className="mt-4 border-t pt-4 text-center" onClick={stop} onMouseDown={stop}>
-      <p className="mb-2 text-sm font-semibold text-foreground">Purchase Category</p>
       <div className="flex flex-wrap items-center justify-center gap-2">
         {monthly && (
           <Button
