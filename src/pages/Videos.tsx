@@ -253,6 +253,67 @@ export default function Videos() {
 
   const hasActiveFilters = searchQuery || categoryPath.length > 0;
 
+  // --- Subscription / checkout helpers ---------------------------------
+  const topLevelAncestorId = (catId: number): number | null => {
+    let cur = categoriesById.get(catId);
+    if (!cur) return null;
+    while (cur && cur.parent_id != null) {
+      const parent = categoriesById.get(cur.parent_id);
+      if (!parent) break;
+      cur = parent;
+    }
+    return cur?.id ?? null;
+  };
+
+  const entitlementFor = (
+    topCatId: number,
+    interval: "month" | "year"
+  ): Entitlement | undefined =>
+    entitlements.find(
+      (e) =>
+        e.access_type === "category" &&
+        e.category_id === topCatId &&
+        e.billing_interval === interval
+    );
+
+  const accessibleCategoryIds = useMemo(() => {
+    const ids = new Set<number>();
+    let hasFull = false;
+    const subPriceIds = new Set(
+      userSubs
+        .filter((s) => !s.current_period_end || new Date(s.current_period_end) > new Date())
+        .map((s) => s.price_id)
+        .filter(Boolean) as string[]
+    );
+    for (const e of entitlements) {
+      if (!subPriceIds.has(e.stripe_price_id)) continue;
+      if (e.access_type === "full") hasFull = true;
+      else if (e.category_id != null) ids.add(e.category_id);
+    }
+    return { ids, hasFull };
+  }, [entitlements, userSubs]);
+
+  const userHasCategoryAccess = (catId: number): boolean => {
+    if (accessibleCategoryIds.hasFull) return true;
+    const top = topLevelAncestorId(catId);
+    return top != null && accessibleCategoryIds.ids.has(top);
+  };
+
+  const handleCheckout = async (priceId: string) => {
+    setLoadingPriceId(priceId);
+    const returnPath = `/videos${categoryPath.length ? `?path=${categoryPath.join(",")}` : ""}`;
+    const err = await startCategoryCheckout(priceId, returnPath);
+    if (err) {
+      toast({
+        title: "Checkout Error",
+        description: err,
+        variant: "destructive",
+      });
+    }
+    setLoadingPriceId(null);
+  };
+
+
   const crumbs = categoryPath
     .map((id) => categoriesById.get(id))
     .filter(Boolean) as Category[];
