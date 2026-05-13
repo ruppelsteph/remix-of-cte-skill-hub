@@ -196,16 +196,16 @@ export function VideoCard({ video, pathway, categoryName, index = 0 }: VideoCard
               {video.description}
             </p>
           )}
-          <div className="mt-3 flex items-center justify-end">
+          <div className="mt-3 text-center flex items-start justify-center">
             {hasAccess ? (
-              <Button asChild size="sm">
+              <Button asChild size="sm" className="text-center">
                 <Link to={`/videos/${video.id}`}>
                   <Play className="h-4 w-4 mr-1" />
                   Watch Video
                 </Link>
               </Button>
             ) : (
-              <Button type="button" size="sm" variant="outline" onClick={openPreview}>
+              <Button type="button" size="sm" variant="outline" onClick={openPreview} className="text-center">
                 <Play className="h-4 w-4 mr-1" />
                 Watch Preview
               </Button>
