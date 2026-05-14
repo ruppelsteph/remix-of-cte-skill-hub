@@ -24,8 +24,6 @@ const footerLinks = {
 
 const socialLinks = [
   { icon: Facebook, href: "https://www.facebook.com/iecsimulation/", label: "Facebook" },
-  { icon: Twitter, href: "#", label: "Twitter" },
-  { icon: Linkedin, href: "#", label: "LinkedIn" },
   { icon: Youtube, href: "https://www.youtube.com/user/iecSimulations", label: "YouTube" },
 ];
 
